@@ -17,11 +17,11 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/microsoft/pxt.git"
+    "url": "git+https://github.com/paulallington/pxt.git"
   },
   "author": "Microsoft Corporation",
   "license": "MIT",
-  "homepage": "https://github.com/microsoft/pxt#readme",
+  "homepage": "https://github.com/paulallington/pxt#readme",
   "files": [
     "README.md",
     "built/*.js",
@@ -66,6 +66,7 @@
     "@microsoft/immersive-reader-sdk": "1.1.0",
     "applicationinsights-js": "^1.0.20",
     "browserify": "16.2.3",
+    "build": "^0.1.4",
     "chai": "^3.5.0",
     "cssnano": "4.1.10",
     "dompurify": "2.0.8",

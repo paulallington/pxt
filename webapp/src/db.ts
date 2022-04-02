@@ -1,5 +1,6 @@
 // eslint-disable-next-line no-var
 declare var require: any;
+import U = pxt.Util;
 
 const PouchDB = require("pouchdb")
     .plugin(require('pouchdb-adapter-memory'));
@@ -32,13 +33,21 @@ export class Table {
     constructor(public name: string) { }
 
     getAsync(id: string): Promise<any> {
-        return getDbAsync().then(db => db.get(this.name + "--" + id)).then((v: any) => {
-            v.id = id
-            return v
-        })
+	    console.log("DB getAsync", id);
+        return U.requestAsync({
+            url: "https://online.thecodezone.co.uk/api/Project/GetMakeCode/" + id,
+            method: "GET",
+            withCredentials: true
+        }).then(resp => resp.json);
+
+        //return getDbAsync().then(db => db.get(this.name + "--" + id)).then((v: any) => {
+        //    v.id = id
+        //    return v
+        //})
     }
 
     getAllAsync(): Promise<any[]> {
+	console.log("DB getAllAsync");
         return getDbAsync().then(db => db.allDocs({
             include_docs: true,
             startkey: this.name + "--",
@@ -84,8 +93,18 @@ export class Table {
     }
 
     private setAsyncNoRetry(obj: any): Promise<string> {
+		
         if (obj.id && !obj._id)
             obj._id = this.name + "--" + obj.id
+		
+		console.log("DB setAsync", obj);
+        U.requestAsync({
+            url: "https://online.thecodezone.co.uk/api/Project/PutMakeCode/" + obj.id,
+            method: "POST",
+            withCredentials: true,
+            data: obj
+        }).then((resp) => { console.log("RESPONSE", resp); });
+		
         return getDbAsync().then(db => db.put(obj)).then((resp: any) => resp.rev)
     }
 }
