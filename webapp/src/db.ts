@@ -35,7 +35,7 @@ export class Table {
     getAsync(id: string): Promise<any> {
 	    console.log("DB getAsync", id);
         return U.requestAsync({
-            url: "https://online.thecodezone.co.uk/api/Project/GetMakeCode/" + id,
+            url: "https://stage.thecodezone.co.uk/api/Project/GetMakeCode/" + id,
             method: "GET",
             withCredentials: true
         }).then(resp => resp.json);
@@ -99,7 +99,7 @@ export class Table {
 		
 		console.log("DB setAsync", obj);
         U.requestAsync({
-            url: "https://online.thecodezone.co.uk/api/Project/PutMakeCode/" + obj.id,
+            url: "https://stage.thecodezone.co.uk/api/Project/PutMakeCode/" + obj._id,
             method: "POST",
             withCredentials: true,
             data: obj
