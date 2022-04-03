@@ -447,6 +447,9 @@ declare namespace pxt {
         downloadDialogTheme?: DownloadDialogTheme;
         winAppDeprImage?: string; // Image to show on Windows App for deprecation
         showWinAppDeprBanner?: boolean; // show banner announcing Windows App deprecation
+        javaScript?: boolean; // allow javascript blocks
+        showDelete?: boolean; // show delete option in menu
+        showReset?: boolean; // show reset option in menu
     }
 
     interface DownloadDialogTheme {

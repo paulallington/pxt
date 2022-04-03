@@ -287,6 +287,8 @@ export class SettingsMenu extends data.Component<SettingsMenuProps, SettingsMenu
         const showProjectSettings = targetTheme.showProjectSettings;
         const docItems = targetTheme.docMenu && targetTheme.docMenu.filter(d => !d.tutorial);
         const usbIcon = pxt.appTarget.appTheme.downloadDialogTheme?.deviceIcon || "usb";
+        const showDelete = pxt.appTarget.appTheme.showDelete;
+        const showReset = pxt.appTarget.appTheme.showReset;
 
         // Electron does not currently support webusb
         // Targets with identity show github user on the profile screen.
@@ -305,7 +307,7 @@ export class SettingsMenu extends data.Component<SettingsMenuProps, SettingsMenu
             {pxt.webBluetooth.isAvailable() ? <sui.Item role="menuitem" icon='bluetooth' text={lf("Pair Bluetooth")} onClick={this.pairBluetooth} /> : undefined}
             {showPrint ? <sui.Item role="menuitem" icon="print" text={lf("Print...")} onClick={this.print} /> : undefined}
             {showSave ? <sui.Item role="menuitem" icon="save" text={lf("Save Project")} onClick={this.saveProject} /> : undefined}
-            {!isController ? <sui.Item role="menuitem" icon="trash" text={lf("Delete Project")} onClick={this.removeProject} /> : undefined}
+            {!isController && showDelete ? <sui.Item role="menuitem" icon="trash" text={lf("Delete Project")} onClick={this.removeProject} /> : undefined}
             {showSimCollapse ? <sui.Item role="menuitem" icon='toggle right' text={lf("Toggle the simulator")} onClick={this.toggleCollapse} /> : undefined}
             <div className="ui divider"></div>
             {targetTheme.selectLanguage ? <sui.Item icon='xicon globe' role="menuitem" text={lf("Language")} onClick={this.showLanguagePicker} /> : undefined}
@@ -322,7 +324,7 @@ export class SettingsMenu extends data.Component<SettingsMenuProps, SettingsMenu
             </div> : undefined}
             {showCenterDivider && <div className="ui divider"></div>}
             {reportAbuse ? <sui.Item role="menuitem" icon="warning circle" text={lf("Report Abuse...")} onClick={this.showReportAbuse} /> : undefined}
-            {!isController ? <sui.Item role="menuitem" icon='sign out' text={lf("Reset")} onClick={this.showResetDialog} /> : undefined}
+            {!isController && showReset ? <sui.Item role="menuitem" icon='sign out' text={lf("Reset")} onClick={this.showResetDialog} /> : undefined}
             <sui.Item role="menuitem" text={lf("About...")} onClick={this.showAboutDialog} />
             {
                 // we always need a way to clear local storage, regardless if signed in or not
@@ -485,12 +487,13 @@ export class EditorSelector extends data.Component<IEditorSelectorProps, {}> {
         const noJavaScript = languageRestriction === pxt.editor.LanguageRestriction.NoJavaScript;
         const noPython = languageRestriction === pxt.editor.LanguageRestriction.NoPython;
         const noBlocks = languageRestriction === pxt.editor.LanguageRestriction.NoBlocks;
+        const javaScript = pxt.appTarget.appTheme.javaScript;
 
         // show python in toggle if: python editor currently active, or blocks editor active & saved language pref is python
         const pythonIsActive = (parent.isPythonActive() || pxt.shell.isPyLangPref());
         const showPython = python && !tsOnly && !blocksOnly && !noPython;
         const showBlocks = !pyOnly && !tsOnly && !noBlocks && !!pkg.mainEditorPkg().files[pxt.MAIN_BLOCKS];
-        const showJavaScript = !noJavaScript && !pyOnly && !blocksOnly;
+        const showJavaScript = !noJavaScript && !pyOnly && !blocksOnly && javaScript;
         const showSandbox = sandbox && !headless;
         const showDropdown = showPython && showJavaScript && showBlocks;
         const showAssets = pxt.appTarget.appTheme.assetEditor && !sandbox;
@@ -498,7 +501,7 @@ export class EditorSelector extends data.Component<IEditorSelectorProps, {}> {
         let textLanguage: JSX.Element = undefined;
         let secondTextLanguage: JSX.Element = undefined;
 
-        if (showDropdown) {
+        if (showDropdown && javaScript) {
             if (pythonIsActive) textLanguage = <PythonMenuItem parent={parent}/>
             else textLanguage = <JavascriptMenuItem parent={parent}/>
         }
