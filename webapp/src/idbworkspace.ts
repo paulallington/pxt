@@ -38,7 +38,7 @@ async function migrateBrowserWorkspaceAsync(): Promise<void> {
         await setAsync(h, undefined, resp.text);
     };
 
-    const previousHeaders = await browserworkspace.provider.listAsync();
+    const previousHeaders = await browserworkspace.provider.listAsync("");
 
     await Promise.all(previousHeaders.map(h => copyProject(h)));
 }

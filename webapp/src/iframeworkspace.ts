@@ -27,7 +27,7 @@ function listAsync() {
         // controllerId is a unique identifier of the controller source
         pxt.tickEvent("pxt.controller", { controllerId: msg.controllerId });
 
-        return mem.provider.listAsync()
+        return mem.provider.listAsync("")
     })
 }
 

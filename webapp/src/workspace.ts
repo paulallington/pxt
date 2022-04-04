@@ -6,11 +6,12 @@ import * as db from "./db";
 import * as core from "./core";
 import * as data from "./data";
 import * as browserworkspace from "./browserworkspace"
-import * as fileworkspace from "./fileworkspace"
+// import * as fileworkspace from "./fileworkspace"
 import * as memoryworkspace from "./memoryworkspace"
-import * as iframeworkspace from "./iframeworkspace"
+// import * as iframeworkspace from "./iframeworkspace"
+import * as theCodeZoneWorkspace from "./thecodezoneworkspace"
 import * as cloudsync from "./cloudsync"
-import * as indexedDBWorkspace from "./idbworkspace";
+// import * as indexedDBWorkspace from "./idbworkspace";
 import * as compiler from "./compiler"
 import * as auth from "./auth"
 import * as cloud from "./cloud"
@@ -63,30 +64,32 @@ export function setupWorkspace(id: string) {
     pxt.log(`workspace: ${id}`);
     implType = id ?? "browser";
     switch (id) {
-        case "fs":
-        case "file":
-            // Local file workspace, serializes data under target/projects/
-            impl = fileworkspace.provider;
-            break;
-        case "mem":
-        case "memory":
-            impl = memoryworkspace.provider;
-            break;
-        case "iframe":
-            // Iframe workspace, the editor relays sync messages back and forth when hosted in an iframe
-            impl = iframeworkspace.provider;
-            break;
-        case "uwp":
-            fileworkspace.setApiAsync(pxt.winrt.workspace.fileApiAsync);
-            impl = pxt.winrt.workspace.getProvider(fileworkspace.provider);
-            break;
-        case "idb":
-            impl = indexedDBWorkspace.provider;
-            break;
-        case "browser":
-        default:
-            impl = browserworkspace.provider
-            break;
+        // case "fs":
+        // case "file":
+        //     // Local file workspace, serializes data under target/projects/
+        //     impl = fileworkspace.provider;
+        //     break;
+        // case "mem":
+        // case "memory":
+        //     impl = memoryworkspace.provider;
+        //     break;
+        // case "iframe":
+        //     // Iframe workspace, the editor relays sync messages back and forth when hosted in an iframe
+        //     impl = iframeworkspace.provider;
+        //     break;
+        // case "uwp":
+        //     fileworkspace.setApiAsync(pxt.winrt.workspace.fileApiAsync);
+        //     impl = pxt.winrt.workspace.getProvider(fileworkspace.provider);
+        //     break;
+        // case "idb":
+        //     impl = indexedDBWorkspace.provider;
+        //     break;
+        case "tczApi":
+            impl = theCodeZoneWorkspace.provider;
+        // case "browser":
+        // default:
+        //     impl = browserworkspace.provider
+        //     break;
     }
 }
 
@@ -1536,12 +1539,15 @@ let syncAsyncPromise: Promise<pxt.editor.EditorSyncState>;
 export function syncAsync(): Promise<pxt.editor.EditorSyncState> {
     pxt.debug("workspace: sync")
     if (syncAsyncPromise) return syncAsyncPromise;
-    return syncAsyncPromise = impl.listAsync()
+    let urlQuery = U.parseQueryString(window.location.href);
+    const projectID = urlQuery["pid"];
+    console.log("Project ID " + projectID)
+    return syncAsyncPromise = impl.listAsync(projectID)
         .catch((e) => {
             // There might be a problem with the native databases. Switch to memory for this session so the user can at
             // least use the editor.
             return switchToMemoryWorkspace("sync failed")
-                .then(() => impl.listAsync());
+                .then(() => impl.listAsync(projectID));
         })
         .then(headers => {
             const existing = U.toDictionary(allScripts || [], h => h.header.id)

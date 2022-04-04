@@ -5183,7 +5183,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     const isSandbox = pxt.shell.isSandboxMode() || pxt.shell.isReadOnly();
     const isController = pxt.shell.isControllerMode();
     let theme = pxt.appTarget.appTheme;
-    if (query["ws"]) workspace.setupWorkspace(query["ws"]);
+    if (pxt.appTarget.appTheme.tczApi === true) workspace.setupWorkspace("tczworkspace");
+    else if (query["ws"]) workspace.setupWorkspace(query["ws"]);
     else if ((theme.allowParentController || isController) && pxt.BrowserUtils.isIFrame()) workspace.setupWorkspace("iframe");
     else if (isSandbox) workspace.setupWorkspace("mem");
     else if (pxt.winrt.isWinRT()) workspace.setupWorkspace("uwp");
