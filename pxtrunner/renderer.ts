@@ -1252,6 +1252,9 @@ namespace pxt.runner {
     }
 
     function renderSims(options: ClientRenderOptions) {
+		const query = pxt.Util.parseQueryString(window.location.href);
+		if (query['editor']) return;
+	
         if (!options.simulatorClass) return;
         // simulators
         $('.' + options.simulatorClass).each((i, c) => {
