@@ -84,7 +84,8 @@ export function setupWorkspace(id: string) {
         // case "idb":
         //     impl = indexedDBWorkspace.provider;
         //     break;
-        case "tczApi":
+        default:
+        case "tczworkspace":
             impl = theCodeZoneWorkspace.provider;
         // case "browser":
         // default:
