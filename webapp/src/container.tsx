@@ -481,8 +481,6 @@ export class EditorSelector extends data.Component<IEditorSelectorProps, {}> {
     }
 
     renderCore() {
-        let query = Util.parseQueryString(window.location.href)
-        console.log(`No Blocks: ${query['no_blocks']}`);
         const { python, sandbox, headless, languageRestriction, parent } = this.props;
         const dropdownActive = python && (parent.isJavaScriptActive() || parent.isPythonActive());
         const tsOnly = languageRestriction === pxt.editor.LanguageRestriction.JavaScriptOnly;
@@ -490,7 +488,7 @@ export class EditorSelector extends data.Component<IEditorSelectorProps, {}> {
         const blocksOnly = languageRestriction === pxt.editor.LanguageRestriction.BlocksOnly;
         const noJavaScript = languageRestriction === pxt.editor.LanguageRestriction.NoJavaScript;
         const noPython = languageRestriction === pxt.editor.LanguageRestriction.NoPython;
-        const noBlocks = languageRestriction === pxt.editor.LanguageRestriction.NoBlocks || query['no_blocks'];
+        const noBlocks = languageRestriction === pxt.editor.LanguageRestriction.NoBlocks;
         const javaScript = pxt.appTarget.appTheme.javaScript;
 
         // show python in toggle if: python editor currently active, or blocks editor active & saved language pref is python
