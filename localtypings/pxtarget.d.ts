@@ -296,6 +296,7 @@ declare namespace pxt {
         TOC?: TOCMenuEntry[];
         hideSideDocs?: boolean;
         tczApi?: boolean; // are we using TCZ API
+        tczApiDomain?: string; // the code zone API domain
         homeScreenHero?: string | CodeCard; // home screen hero image or codecard
         homeScreenHeroGallery?: string; // path to markdown file containing the gallery to display on homescreen
         sideDoc?: string; // deprecated

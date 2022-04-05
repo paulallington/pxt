@@ -6,12 +6,12 @@ import * as db from "./db";
 import * as core from "./core";
 import * as data from "./data";
 import * as browserworkspace from "./browserworkspace"
-// import * as fileworkspace from "./fileworkspace"
+import * as fileworkspace from "./fileworkspace"
 import * as memoryworkspace from "./memoryworkspace"
-// import * as iframeworkspace from "./iframeworkspace"
+import * as iframeworkspace from "./iframeworkspace"
 import * as theCodeZoneWorkspace from "./thecodezoneworkspace"
 import * as cloudsync from "./cloudsync"
-// import * as indexedDBWorkspace from "./idbworkspace";
+import * as indexedDBWorkspace from "./idbworkspace";
 import * as compiler from "./compiler"
 import * as auth from "./auth"
 import * as cloud from "./cloud"
@@ -62,35 +62,36 @@ export function copyProjectToLegacyEditor(header: Header, majorVersion: number):
 export function setupWorkspace(id: string) {
     U.assert(!impl, "workspace set twice");
     pxt.log(`workspace: ${id}`);
+    console.log(`workspace: ${id}`);
     implType = id ?? "browser";
     switch (id) {
-        // case "fs":
-        // case "file":
-        //     // Local file workspace, serializes data under target/projects/
-        //     impl = fileworkspace.provider;
-        //     break;
-        // case "mem":
-        // case "memory":
-        //     impl = memoryworkspace.provider;
-        //     break;
-        // case "iframe":
-        //     // Iframe workspace, the editor relays sync messages back and forth when hosted in an iframe
-        //     impl = iframeworkspace.provider;
-        //     break;
-        // case "uwp":
-        //     fileworkspace.setApiAsync(pxt.winrt.workspace.fileApiAsync);
-        //     impl = pxt.winrt.workspace.getProvider(fileworkspace.provider);
-        //     break;
-        // case "idb":
-        //     impl = indexedDBWorkspace.provider;
-        //     break;
-        default:
+        case "fs":
+        case "file":
+            // Local file workspace, serializes data under target/projects/
+            impl = fileworkspace.provider;
+            break;
+        case "mem":
+        case "memory":
+            impl = memoryworkspace.provider;
+            break;
+        case "iframe":
+            // Iframe workspace, the editor relays sync messages back and forth when hosted in an iframe
+            impl = iframeworkspace.provider;
+            break;
+        case "uwp":
+            fileworkspace.setApiAsync(pxt.winrt.workspace.fileApiAsync);
+            impl = pxt.winrt.workspace.getProvider(fileworkspace.provider);
+            break;
+        case "idb":
+            impl = indexedDBWorkspace.provider;
+            break;
         case "tczworkspace":
             impl = theCodeZoneWorkspace.provider;
-        // case "browser":
-        // default:
-        //     impl = browserworkspace.provider
-        //     break;
+            break;
+        default:
+        case "browser":
+            impl = browserworkspace.provider
+            break;
     }
 }
 

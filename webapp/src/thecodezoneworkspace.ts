@@ -17,16 +17,17 @@ export function merge(prj: Project) {
     projects[prj.header.id] = prj;
 }
 
-async function listAsync(project_id: string): Promise<Header[]> {
-    let p = await getProjectAsync(project_id);
-    console.log("listAsync", project_id, p);
+async function listAsync(ProjectId: string): Promise<Header[]> {
+    let p = await getProjectAsync(ProjectId);
+    console.log("listAsync", ProjectId, p);
     return Promise.resolve([p.header]);
 }
 
-async function getProjectAsync(project_id: string): Promise<Project>
+async function getProjectAsync(ProjectId: string): Promise<Project>
 {
+    console.log(`API Domain: ${pxt.appTarget.appTheme.tczApiDomain}`);
     return U.requestAsync({
-        url: "https://stage.thecodezone.co.uk/api/Project/GetMakeCode/" + project_id,
+        url: pxt.appTarget.appTheme.tczApiDomain + "/api/Project/GetMakeCode/" + ProjectId,
         method: "GET",
         withCredentials: true
     }).then(resp => resp.json);
@@ -51,8 +52,9 @@ async function setAsync(h: Header, prevVer: any, text?: ScriptText) {
             text: text
         }
 
+        console.log(`API Domain: ${pxt.appTarget.appTheme.tczApiDomain}`);
         U.requestAsync({
-            url: "https://stage.thecodezone.co.uk/api/Project/PutMakeCode/" + h.id,
+            url: pxt.appTarget.appTheme.tczApiDomain + "/api/Project/PutMakeCode/" + h.id,
             method: "POST",
             withCredentials: true,
             data: obj

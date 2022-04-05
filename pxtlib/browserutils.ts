@@ -1,6 +1,11 @@
 namespace pxt.BrowserUtils {
+    import Util = pxt.Util;
 
     export function isIFrame(): boolean {
+        let query = Util.parseQueryString(window.location.href);
+        console.log(`Run as edditor: ${query['editor']}`);
+        if (query['editor']) return false;
+
         try {
             return window && window.self !== window.top;
         } catch (e) {

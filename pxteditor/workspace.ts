@@ -23,7 +23,7 @@ namespace pxt.workspace {
     }
 
     export interface WorkspaceProvider {
-        listAsync(project_id: string): Promise<Header[]>; // called from workspace.syncAsync (including upon startup)
+        listAsync(ProjectId: string): Promise<Header[]>; // called from workspace.syncAsync (including upon startup)
         getAsync(h: Header): Promise<File>;
         setAsync(h: Header, prevVersion: Version, text?: ScriptText): Promise<Version>;
         deleteAsync?: (h: Header, prevVersion: Version) => Promise<void>;
