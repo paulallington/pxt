@@ -476,8 +476,17 @@ interface IEditorSelectorProps extends ISettingsProps {
 }
 
 export class EditorSelector extends data.Component<IEditorSelectorProps, {}> {
+    private readonly hideBlockCheck: boolean;
     constructor(props: ISettingsProps) {
         super(props);
+        this.hideBlockCheck = this.tczApiHideBlockCheck();
+    }
+
+     tczApiHideBlockCheck() {
+        let urlQuery = Util.parseQueryString(window.location.href);
+        const resp = Util.requestNoAsync("http://localhost:8080/api/Account/MakeCodeHideBlockCheck/" + urlQuery["pid"]);
+        console.log(JSON.parse(resp));
+        return JSON.parse(resp).result;
     }
 
     renderCore() {
@@ -488,7 +497,7 @@ export class EditorSelector extends data.Component<IEditorSelectorProps, {}> {
         const blocksOnly = languageRestriction === pxt.editor.LanguageRestriction.BlocksOnly;
         const noJavaScript = languageRestriction === pxt.editor.LanguageRestriction.NoJavaScript;
         const noPython = languageRestriction === pxt.editor.LanguageRestriction.NoPython;
-        const noBlocks = languageRestriction === pxt.editor.LanguageRestriction.NoBlocks;
+        const noBlocks = languageRestriction === pxt.editor.LanguageRestriction.NoBlocks || this.hideBlockCheck;
         const javaScript = pxt.appTarget.appTheme.javaScript;
 
         // show python in toggle if: python editor currently active, or blocks editor active & saved language pref is python

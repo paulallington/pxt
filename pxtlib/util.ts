@@ -861,6 +861,13 @@ namespace ts.pxtc.Util {
         json?: any;
     }
 
+    export function requestNoAsync(url: string) {
+        let xmlHttp = new XMLHttpRequest();
+        xmlHttp.open( "GET", url, false ); // false for synchronous request
+        xmlHttp.send( null );
+        return xmlHttp.responseText;
+    }
+
     // debug flag
     //export let debugHttpRequests = false;
     export function requestAsync(options: HttpRequestOptions): Promise<HttpResponse> {
