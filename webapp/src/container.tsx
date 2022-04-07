@@ -479,14 +479,20 @@ export class EditorSelector extends data.Component<IEditorSelectorProps, {}> {
     private readonly hideBlockCheck: boolean;
     constructor(props: ISettingsProps) {
         super(props);
-        this.hideBlockCheck = this.tczApiHideBlockCheck();
+        this.hideBlockCheck = this.renderBlocksCheck();
     }
 
-     tczApiHideBlockCheck() {
+     renderBlocksCheck() {
         let urlQuery = Util.parseQueryString(window.location.href);
-        const resp = Util.requestNoAsync("http://localhost:8080/api/Account/MakeCodeHideBlockCheck/" + urlQuery["pid"]);
-        console.log(JSON.parse(resp));
-        return JSON.parse(resp).result;
+        if (urlQuery["hide_blocks"]){
+            console.log("Blocks hidden from url arg");
+            return true;
+        }
+        else{
+            const resp = Util.requestNoAsync(pxt.appTarget.appTheme.tczApiDomain + "/api/Account/MakeCodeHideBlockCheck/" + urlQuery["pid"]);
+            console.log(JSON.parse(resp));
+            return JSON.parse(resp).result;
+        }
     }
 
     renderCore() {
