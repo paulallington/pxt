@@ -1541,15 +1541,12 @@ let syncAsyncPromise: Promise<pxt.editor.EditorSyncState>;
 export function syncAsync(): Promise<pxt.editor.EditorSyncState> {
     pxt.debug("workspace: sync")
     if (syncAsyncPromise) return syncAsyncPromise;
-    let urlQuery = U.parseQueryString(window.location.href);
-    const projectID = urlQuery["pid"];
-    console.log("Project ID " + projectID)
-    return syncAsyncPromise = impl.listAsync(projectID)
+    return syncAsyncPromise = impl.listAsync()
         .catch((e) => {
             // There might be a problem with the native databases. Switch to memory for this session so the user can at
             // least use the editor.
             return switchToMemoryWorkspace("sync failed")
-                .then(() => impl.listAsync(projectID));
+                .then(() => impl.listAsync());
         })
         .then(headers => {
             const existing = U.toDictionary(allScripts || [], h => h.header.id)

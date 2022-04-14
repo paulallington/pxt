@@ -5,6 +5,8 @@ type WorkspaceProvider = pxt.workspace.WorkspaceProvider;
 import U = pxt.Util;
 
 export let projects: pxt.Map<Project> = {};
+let urlQuery = U.parseQueryString(window.location.href);
+const projectId = urlQuery["pid"];
 
 export function merge(prj: Project) {
     let h: Header = prj.header;
@@ -17,24 +19,25 @@ export function merge(prj: Project) {
     projects[prj.header.id] = prj;
 }
 
-async function listAsync(ProjectId: string): Promise<Header[]> {
-    let p = await getProjectAsync(ProjectId);
-    console.log("listAsync", ProjectId, p);
+async function listAsync(): Promise<Header[]> {
+    let p = await getProjectAsync();
+    console.log("listAsync", projectId, p);
     return Promise.resolve([p.header]);
 }
 
-async function getProjectAsync(ProjectId: string): Promise<Project>
+async function getProjectAsync(): Promise<Project>
 {
     console.log(`API Domain: ${pxt.appTarget.appTheme.tczApiDomain}`);
+    console.log(`Loading Project From: ${pxt.appTarget.appTheme.tczApiDomain + "/api/Project/GetMakeCode/" + projectId}`);
     return U.requestAsync({
-        url: pxt.appTarget.appTheme.tczApiDomain + "/api/Project/GetMakeCode/" + ProjectId,
+        url: pxt.appTarget.appTheme.tczApiDomain + "/api/Project/GetMakeCode/" + projectId,
         method: "GET",
         withCredentials: true
     }).then(resp => resp.json);
 }
 
 async function getAsync(h: Header): Promise<pxt.workspace.File> {
-    let p = await getProjectAsync(h.id);
+    let p = await getProjectAsync();
 
     return Promise.resolve({
         header: h,
@@ -53,8 +56,9 @@ async function setAsync(h: Header, prevVer: any, text?: ScriptText) {
         }
 
         console.log(`API Domain: ${pxt.appTarget.appTheme.tczApiDomain}`);
+        console.log(`Saving Project To: ${pxt.appTarget.appTheme.tczApiDomain + "/api/Project/PutMakeCode/" + projectId}`);
         U.requestAsync({
-            url: pxt.appTarget.appTheme.tczApiDomain + "/api/Project/PutMakeCode/" + h.id,
+            url: pxt.appTarget.appTheme.tczApiDomain + "/api/Project/PutMakeCode/" + projectId,
             method: "POST",
             withCredentials: true,
             data: obj
