@@ -1,9 +1,7 @@
 import * as React from "react";
 import { classList, ControlProps, fireClickOnEnter } from "../util";
 
-export interface ButtonProps extends ControlProps {
-    onClick: () => void;
-    onKeydown?: (e: React.KeyboardEvent) => void;
+export interface ButtonViewProps extends ControlProps {
     buttonRef?: (ref: HTMLButtonElement) => void;
     title: string;
     label?: string | JSX.Element;
@@ -21,6 +19,12 @@ export interface ButtonProps extends ControlProps {
     ariaPosInSet?: number;
     ariaSetSize?: number;
     ariaSelected?: boolean;
+}
+
+
+export interface ButtonProps extends ButtonViewProps {
+    onClick: () => void;
+    onKeydown?: (e: React.KeyboardEvent) => void;
 }
 
 export const Button = (props: ButtonProps) => {
@@ -56,9 +60,11 @@ export const Button = (props: ButtonProps) => {
         disabled && "disabled"
     );
 
-    let clickHandler = () => {
+    let clickHandler = (ev: React.MouseEvent) => {
         if (onClick) onClick();
         if (href) window.open(href, target || "_blank", "noopener,noreferrer")
+        ev.stopPropagation();
+        ev.preventDefault();
     }
 
     return (
