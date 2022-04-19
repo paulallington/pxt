@@ -5,8 +5,7 @@ type WorkspaceProvider = pxt.workspace.WorkspaceProvider;
 import U = pxt.Util;
 
 export let projects: pxt.Map<Project> = {};
-let urlQuery = U.parseQueryString(window.location.href);
-const projectId = urlQuery["pid"];
+const projectId = U.parseQueryString(window.location.href)["pid"];
 
 export function merge(prj: Project) {
     let h: Header = prj.header;

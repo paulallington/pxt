@@ -11,6 +11,8 @@ import * as identity from "./identity";
 import { ProjectView } from "./app";
 import { clearDontShowDownloadDialogFlag } from "./dialogs";
 
+import Util = pxt.Util;
+
 type ISettingsProps = pxt.editor.ISettingsProps;
 
 const enum View {
@@ -25,6 +27,7 @@ interface EditorToolbarState {
 
 export class EditorToolbar extends data.Component<ISettingsProps, EditorToolbarState> {
     protected compileTimeout: number;
+    private readonly isAdmin: string;
 
     constructor(props: ISettingsProps) {
         super(props);
@@ -40,6 +43,7 @@ export class EditorToolbar extends data.Component<ISettingsProps, EditorToolbarS
         this.toggleDebugging = this.toggleDebugging.bind(this);
         this.toggleCollapsed = this.toggleCollapsed.bind(this);
         this.cloudButtonClick = this.cloudButtonClick.bind(this);
+        this.isAdmin = Util.parseQueryString(window.location.href)["admin"];
     }
 
     saveProjectName(name: string, view?: string) {
@@ -333,7 +337,7 @@ export class EditorToolbar extends data.Component<ISettingsProps, EditorToolbarS
             && targetTheme.githubEditor
             && !pxt.winrt.isWinRT() // not supported in windows 10
             && !pxt.BrowserUtils.isPxtElectron()
-            && !readOnly && !isController && !debugging && !tutorial;
+            && !readOnly && !isController && !debugging && !tutorial && this.isAdmin;
 
         const downloadIcon = pxt.appTarget.appTheme.downloadIcon || "download";
 

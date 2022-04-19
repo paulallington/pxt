@@ -115,6 +115,7 @@ export interface SettingsMenuState {
 }
 
 export class SettingsMenu extends data.Component<SettingsMenuProps, SettingsMenuState> {
+    private readonly isAdmin: string;
 
     constructor(props: SettingsMenuProps) {
         super(props);
@@ -140,6 +141,7 @@ export class SettingsMenu extends data.Component<SettingsMenuProps, SettingsMenu
         this.showAboutDialog = this.showAboutDialog.bind(this);
         this.print = this.print.bind(this);
         this.signOutGithub = this.signOutGithub.bind(this);
+        this.isAdmin = Util.parseQueryString(window.location.href)["admin"];
     }
 
     showExitAndSaveDialog() {
@@ -282,7 +284,7 @@ export class SettingsMenu extends data.Component<SettingsMenuProps, SettingsMenu
 
         const showHome = !targetTheme.lockedEditor && !isController && auth.hasIdentity();
         const showShare = this.props.showShare && pxt.appTarget.cloud?.sharing && !isController;
-        const showSave = !readOnly && !isController && !!targetTheme.saveInMenu && !disableFileAccessinMaciOs && !disableFileAccessinAndroid;
+        const showSave = !readOnly && !isController && !!targetTheme.saveInMenu && !disableFileAccessinMaciOs && !disableFileAccessinAndroid || this.isAdmin;
         const showSimCollapse = !readOnly && !isController && !!targetTheme.simCollapseInMenu;
         const showGreenScreen = targetTheme.greenScreen || /greenscreen=1/i.test(window.location.href);
         const showPrint = targetTheme.print && !pxt.BrowserUtils.isIE();
@@ -290,7 +292,7 @@ export class SettingsMenu extends data.Component<SettingsMenuProps, SettingsMenu
         const docItems = targetTheme.docMenu && targetTheme.docMenu.filter(d => !d.tutorial);
         const usbIcon = pxt.appTarget.appTheme.downloadDialogTheme?.deviceIcon || "usb";
         const showDelete = pxt.appTarget.appTheme.showDelete;
-        const showReset = pxt.appTarget.appTheme.showReset;
+        const showReset = pxt.appTarget.appTheme.showReset || this.isAdmin;
 
         // Electron does not currently support webusb
         // Targets with identity show github user on the profile screen.
