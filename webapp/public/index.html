@@ -27,17 +27,29 @@
         })();
     }
 
-    $(document).ready(function() {
-        setTimeout(function() {
-            $('.python-menuitem').click();
-        }, 5000);
-    });
+    let searchParams = new URLSearchParams(window.location.search);
+    const isSimulatorOnly = searchParams.has('simulator');
 
-    $(document).ready(function() {
-        setTimeout(function() {
-            $('#computertogglesim').click();
-        }, 5000);
-    });
+    if (isSimulatorOnly) {
+        $(document).ready(function() {
+            setTimeout(function() {
+                $('.sim-menuitem').click();
+            }, 5000);
+        });
+    } else {
+        $(document).ready(function() {
+            setTimeout(function() {
+                $('.python-menuitem').click();
+            }, 5000);
+        });
+
+        $(document).ready(function() {
+            setTimeout(function() {
+                $('#computertogglesim').click();
+            }, 5000);
+        });
+    }
+
 	</script>
 
     <!-- @include appmeta.html -->
