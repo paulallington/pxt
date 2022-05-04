@@ -374,6 +374,7 @@ export class Editor extends toolboxeditor.ToolboxEditor {
 
     private handleFlyoutWheel = (e: WheelEvent) => e.stopPropagation();
     private handleFlyoutScroll = (e: WheelEvent) => e.stopPropagation();
+    private hideBlocks: boolean;
 
     constructor(parent: pxt.editor.IProjectView) {
         super(parent);
@@ -384,6 +385,7 @@ export class Editor extends toolboxeditor.ToolboxEditor {
         this.goToError = this.goToError.bind(this);
         this.startDebugger = this.startDebugger.bind(this)
         this.onUserPreferencesChanged = this.onUserPreferencesChanged.bind(this);
+        this.hideBlocks = pxt.BrowserUtils.renderBlocksCheck();
 
         data.subscribe(this.userPreferencesSubscriber, auth.HIGHCONTRAST);
     }
@@ -408,6 +410,21 @@ export class Editor extends toolboxeditor.ToolboxEditor {
     public async openBlocksAsync() {
         pxt.tickEvent(`typescript.showBlocks`);
         let initPromise = Promise.resolve();
+
+        if (this.hideBlocks) {
+            alert("Blocks are currently disabled")
+            return;
+        }
+
+        const proceed = confirm("If you go to Blocks your Python code will be re-ordered and some variable names may " +
+            "change, are you sure you want to continue?");
+        if (proceed) {
+            let mainPkg = pkg.mainEditorPkg()
+            const pyFile = mainPkg.files[pxt.MAIN_PY].content
+            mainPkg.setContentAsync("main_backup.py", pyFile)
+        }else {
+            return;
+        }
 
         const isWinApp = pxt.BrowserUtils.isWinRT();
         if (isWinApp) {

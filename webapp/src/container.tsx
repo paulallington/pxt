@@ -292,7 +292,7 @@ export class SettingsMenu extends data.Component<SettingsMenuProps, SettingsMenu
         const docItems = targetTheme.docMenu && targetTheme.docMenu.filter(d => !d.tutorial);
         const usbIcon = pxt.appTarget.appTheme.downloadDialogTheme?.deviceIcon || "usb";
         const showDelete = pxt.appTarget.appTheme.showDelete;
-        const showReset = pxt.appTarget.appTheme.showReset || this.isAdmin;
+        const showReset = pxt.appTarget.appTheme.showReset;
 
         // Electron does not currently support webusb
         // Targets with identity show github user on the profile screen.
@@ -481,20 +481,7 @@ export class EditorSelector extends data.Component<IEditorSelectorProps, {}> {
     private readonly hideBlockCheck: boolean;
     constructor(props: ISettingsProps) {
         super(props);
-        this.hideBlockCheck = this.renderBlocksCheck();
-    }
-
-     renderBlocksCheck() {
-        let urlQuery = Util.parseQueryString(window.location.href);
-        if (urlQuery["hide_blocks"]){
-            console.log("Blocks hidden from url arg");
-            return true;
-        }
-        else{
-            const resp = Util.requestNoAsync(pxt.appTarget.appTheme.tczApiDomain + "/api/Account/MakeCodeHideBlockCheck/" + urlQuery["pid"]);
-            console.log(JSON.parse(resp));
-            return JSON.parse(resp).result;
-        }
+        this.hideBlockCheck = pxt.BrowserUtils.renderBlocksCheck();
     }
 
     renderCore() {

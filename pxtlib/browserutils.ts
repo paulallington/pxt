@@ -13,6 +13,20 @@ namespace pxt.BrowserUtils {
         }
     }
 
+    export function renderBlocksCheck() {
+        let urlQuery = Util.parseQueryString(window.location.href);
+        if (urlQuery["hide_blocks"]){
+            console.log("Blocks hidden from url arg");
+            return true;
+        }
+        else{
+            const resp = Util.requestNoAsync(pxt.appTarget.appTheme.tczApiDomain +
+                "/api/Account/MakeCodeHideBlockCheck/" + urlQuery["pid"]);
+            console.log(JSON.parse(resp));
+            return JSON.parse(resp).result;
+        }
+    }
+
     export function hasNavigator(): boolean {
         return typeof navigator !== "undefined";
     }
