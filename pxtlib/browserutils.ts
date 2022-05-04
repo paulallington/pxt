@@ -19,12 +19,7 @@ namespace pxt.BrowserUtils {
             console.log("Blocks hidden from url arg");
             return true;
         }
-        else{
-            const resp = Util.requestNoAsync(pxt.appTarget.appTheme.tczApiDomain +
-                "/api/Account/MakeCodeHideBlockCheck/" + urlQuery["pid"]);
-            console.log(JSON.parse(resp));
-            return JSON.parse(resp).result;
-        }
+        return false;
     }
 
     export function hasNavigator(): boolean {
