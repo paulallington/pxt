@@ -12,6 +12,10 @@ export interface SoundEffectEditorProps {
     initialSound: pxt.assets.Sound;
 }
 
+export interface CancellationToken {
+    cancelled: boolean;
+}
+
 export const SoundEffectEditor = (props: SoundEffectEditorProps) => {
     const { onSoundChange, onClose, initialSound } = props;
 
@@ -23,10 +27,18 @@ export const SoundEffectEditor = (props: SoundEffectEditorProps) => {
     // that we never stray too far away from where we started
     const [ similarSoundSeed, setSimilarSoundSeed ] = React.useState<pxt.assets.Sound>(undefined);
 
+    const [ cancelToken, setCancelToken ] = React.useState<CancellationToken>(null);
+
     let startPreviewAnimation: (duration: number) => void;
     let startControlsAnimation: (duration: number) => void;
-    let cancelSound: () => void;
-    let previewSynthListener: (freq: number, vol: number, sound: pxt.assets.Sound) => void;
+    let previewSynthListener: (freq: number, vol: number, sound: pxt.assets.Sound, cancelToken: CancellationToken) => void;
+
+    const cancel = () => {
+        if (!cancelToken) return;
+        cancelToken.cancelled = true;
+        if (startPreviewAnimation) startPreviewAnimation(-1);
+        if (startControlsAnimation) startControlsAnimation(-1);
+    }
 
     React.useEffect(() => {
         const keyListener = (ev: KeyboardEvent) => {
@@ -47,19 +59,31 @@ export const SoundEffectEditor = (props: SoundEffectEditorProps) => {
     const play = (toPlay = sound) => {
         const codalSound = soundToCodalSound(toPlay);
 
-        if (cancelSound) cancelSound();
-        let cancelled = false;
-        cancelSound = () => {
-            cancelled = true;
-            if (startPreviewAnimation) startPreviewAnimation(-1);
-            if (startControlsAnimation) startControlsAnimation(-1);
-        }
+        cancel();
+
+        let newToken = {
+            cancelled: false
+        };
+
+        setCancelToken(newToken)
 
         if (startPreviewAnimation) startPreviewAnimation(toPlay.duration);
         if (startControlsAnimation) startControlsAnimation(toPlay.duration);
-        pxsim.codal.music.playSoundExpressionAsync(codalSound.src, () => cancelled, (freq, volume) => {
-            previewSynthListener(freq, volume, toPlay)
-        });
+        pxsim.codal.music.playSoundExpressionAsync(codalSound.src, () => newToken.cancelled, (freq, volume) => {
+            previewSynthListener(freq, volume, toPlay, newToken)
+        })
+        .then(() => {
+            setCancelToken(null);
+        })
+    }
+
+    const handlePlayButtonClick = () => {
+        if (cancelToken) {
+            cancel();
+        }
+        else {
+            play();
+        }
     }
 
     const handleClose = () => {
@@ -78,12 +102,12 @@ export const SoundEffectEditor = (props: SoundEffectEditorProps) => {
         startControlsAnimation = startAnimation;
     }
 
-    const handleSynthListenerRef = (onPull: (freq: number, vol: number, sound: pxt.assets.Sound) => void) => {
+    const handleSynthListenerRef = (onPull: (freq: number, vol: number, sound: pxt.assets.Sound, token: CancellationToken) => void) => {
         previewSynthListener = onPull;
     }
 
     const handleSoundChange = (newSound: pxt.assets.Sound, setSoundSeed = true) => {
-        if (cancelSound) cancelSound();
+        if (cancelToken) cancel();
         if (setSoundSeed) setSimilarSoundSeed(undefined);
         if (onSoundChange) onSoundChange(newSound);
         setSound(newSound);
@@ -101,12 +125,15 @@ export const SoundEffectEditor = (props: SoundEffectEditorProps) => {
             onClose={handleClose}
         />
         <div className="sound-effect-editor-content">
-            <SoundPreview sound={sound} handleStartAnimationRef={handlePreviewAnimationRef} handleSynthListenerRef={handleSynthListenerRef} />
+            <SoundPreview
+                sound={sound}
+                handleStartAnimationRef={handlePreviewAnimationRef}
+                handleSynthListenerRef={handleSynthListenerRef} />
             <Button
                 className="sound-effect-play-button"
-                title={lf("Play")}
-                onClick={play}
-                leftIcon="fas fa-play"
+                title={cancelToken ? lf("Stop") : lf("Play")}
+                onClick={handlePlayButtonClick}
+                leftIcon={cancelToken ? "fas fa-stop" : "fas fa-play"}
                 />
             <SoundControls sound={sound} onSoundChange={handleSoundChange} handleStartAnimationRef={handleControlsAnimationRef} />
             <Button
@@ -177,33 +204,33 @@ function generateSimilarSound(sound: pxt.assets.Sound) {
         newFrequencyDifference *= -1;
     }
 
-    newFrequencyDifference = clamp(newFrequencyDifference, -2000, 2000);
+    newFrequencyDifference = clamp(newFrequencyDifference, -pxt.assets.MAX_FREQUENCY, pxt.assets.MAX_FREQUENCY);
 
     res.startFrequency = clamp(
-        Math.random() * 2000,
+        Math.random() * pxt.assets.MAX_FREQUENCY,
         Math.max(-newFrequencyDifference, 1),
-        clamp(2000 - newFrequencyDifference, 1, 2000)
+        clamp(5000 - newFrequencyDifference, 1, pxt.assets.MAX_FREQUENCY)
     );
 
-    res.endFrequency = clamp(res.startFrequency + newFrequencyDifference, 1, 2000);
+    res.endFrequency = clamp(res.startFrequency + newFrequencyDifference, 1, pxt.assets.MAX_FREQUENCY);
 
     // Same strategy for volume
     const oldVolumeDifference = res.endVolume - res.startVolume;
     let newVolumeDifference = oldVolumeDifference + oldVolumeDifference * (Math.random() - 0.5);
 
-    newVolumeDifference = clamp(newVolumeDifference, -1023, 1023);
+    newVolumeDifference = clamp(newVolumeDifference, -pxt.assets.MAX_VOLUME, pxt.assets.MAX_VOLUME);
 
     if (Math.sign(oldVolumeDifference) !== Math.sign(newVolumeDifference)) {
         newVolumeDifference *= -1;
     }
 
     res.startVolume = clamp(
-        Math.random() * 1023,
+        Math.random() * pxt.assets.MAX_VOLUME,
         Math.max(-newVolumeDifference, 0),
-        clamp(1023 - newVolumeDifference, 0, 1023)
+        clamp(pxt.assets.MAX_VOLUME - newVolumeDifference, 0, pxt.assets.MAX_VOLUME)
     );
 
-    res.endVolume = clamp(res.startVolume + newVolumeDifference, 0, 1023);
+    res.endVolume = clamp(res.startVolume + newVolumeDifference, 0, pxt.assets.MAX_VOLUME);
 
     return res;
 }

@@ -41,7 +41,7 @@ namespace pxtblockly {
 
             this.redrawPreview();
 
-            if (this.workspace)  {
+            if (this.sourceBlock_.workspace)  {
                 this.workspace = this.sourceBlock_.workspace;
                 if (!this.sourceBlock_.isShadow() && !this.sourceBlock_.isInsertionMarker()) {
                     this.registeredChangeListener = true;
@@ -83,6 +83,7 @@ namespace pxtblockly {
                 .size(TOTAL_WIDTH, TOTAL_HEIGHT)
                 .setClass("blocklySpriteField")
                 .stroke("#fff", 1)
+                .fill("#dedede")
                 .corner(TOTAL_HEIGHT / 2);
 
             const clipPathId = "preview-clip-" + pxt.U.guidGen();
@@ -363,8 +364,8 @@ namespace pxtblockly {
                 sound = {
                     duration: 1000,
                     startFrequency: 100,
-                    endFrequency: 1800,
-                    startVolume: 1023,
+                    endFrequency: 4800,
+                    startVolume: 100,
                     endVolume: 0,
                     wave: "sine",
                     interpolation: "linear",

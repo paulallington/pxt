@@ -6,6 +6,7 @@ export interface DraggableGraphProps extends ControlProps {
     min: number;
     max: number;
     squiggly?: boolean;
+    valueUnits?: string;
 
     aspectRatio: number; // width / height
     onPointChange: (index: number, newValue: number) => void;
@@ -30,7 +31,8 @@ export const DraggableGraph = (props: DraggableGraphProps) => {
         ariaDescribedBy,
         role,
         aspectRatio,
-        squiggly
+        squiggly,
+        valueUnits
     } = props;
 
     const width = 1000;
@@ -148,9 +150,11 @@ export const DraggableGraph = (props: DraggableGraphProps) => {
                 const x = Math.max(xSlice * index - halfUnit, unit);
                 const y = yOffset + Math.max(yScale * (max - getValue(index)) - halfUnit, halfUnit);
 
-                // The logarithmic interpolation is perpendicular to the x-axis at the beginning, so
-                // flip the label to the other side if it would overlap path
-                const shouldFlipLabel = isNotLast && interpolation === "logarithmic" && getValue(index + 1) > getValue(index);
+                // Move the labels out of the way of the graph
+                const shouldFlipLabel = (
+                    isNotLast && getValue(index + 1) > getValue(index) ||
+                    !isNotLast && getValue(index - 1) > getValue(index)
+                );
 
                 return <g key={index} className="draggable-graph-column">
                         {isNotLast &&
@@ -184,7 +188,7 @@ export const DraggableGraph = (props: DraggableGraphProps) => {
                             y={shouldFlipLabel ? y + unit * 2 : Math.max(y - unit, unit)}
                             textAnchor={isNotLast ? "start" : "end"}
                             fontSize={unit}>
-                            {Math.round(getValue(index))}
+                            {Math.round(getValue(index)) + (valueUnits || "")}
                         </text>
                         <rect
                             className="draggable-graph-surface"
@@ -232,7 +236,7 @@ function getInterpolationPath(x0: number, y0: number, x1: number, y1: number, cu
     let currX = x0;
     let currY = y0;
 
-    const squiggleAmplitude = 40;
+    const squiggleAmplitude = 20;
 
     for (let i = 1; i < slices + 1; i++) {
         currX = x0 + i * slice;
