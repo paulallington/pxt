@@ -382,7 +382,7 @@ export class MonacoFlyout extends data.Component<MonacoFlyoutProps, MonacoFlyout
                 <div className="description">{description}</div>
                 <div className="signature">
                     <span>{snippet ? snippet : `${qName}(${params ? params.map(p => `${p.name}`).join(", ") : ""})`}</span>
-                    {helpUrl && <a className="blockHelp" href={`/reference/${helpUrl}`} target="_blank" rel="noopener noreferrer" role="button">
+                    {helpUrl && <a className="blockHelp" href={`/docs/reference/${helpUrl}.html`} target="_blank" rel="noopener noreferrer" role="button">
                         <i className="question circle outline icon" aria-label={lf("Open documentation")}></i>
                     </a>}
                 </div>
