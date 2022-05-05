@@ -421,7 +421,7 @@ export class Editor extends toolboxeditor.ToolboxEditor {
         if (proceed) {
             let mainPkg = pkg.mainEditorPkg()
             const pyFile = mainPkg.files[pxt.MAIN_PY].content
-            mainPkg.setContentAsync("main_backup.py", pyFile)
+            mainPkg.setContentAsync("main_backup.txt", pyFile)
         }else {
             return;
         }
