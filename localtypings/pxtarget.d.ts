@@ -49,18 +49,12 @@ declare namespace pxt {
         // list of trusted custom editor extension urls
         // that can bypass consent and send/receive messages
         approvedEditorExtensionUrls?: string[];
-        extensionsToIgnore?: string[]; // List of extensions to ignore when allowing for deletion
-        categories?: ExtensionCategory[];
+        extensionsToolboxDisallowDelete?: string[]; // List of extensions to ignore when allowing for deletion in toolbox
     }
 
     interface RepoData {
         slug: string;
         tags?: string[]
-    }
-
-    interface ExtensionCategory {
-        name: string;
-        extensions: string[];
     }
 
     interface ShareConfig {
@@ -391,6 +385,7 @@ declare namespace pxt {
         hideNewProjectButton?: boolean; // do not show the "new project" button in home page
         saveInMenu?: boolean; // move save icon under gearwheel menu
         lockedEditor?: boolean; // remove default home navigation links from the editor
+        hideReplaceMyCode?: boolean; // hides the "replace my code" button for tutorials with templates in their markdown
         fileNameExclusiveFilter?: string; // anything that does not match this regex is removed from the filename,
         copyrightText?: string; // footer text for any copyright text to be included at the bottom of the home screen and about page
         appFlashingTroubleshoot?: string; // Path to the doc about troubleshooting UWP app flashing failures, e.g. /device/windows-app/troubleshoot
@@ -795,6 +790,7 @@ declare namespace ts.pxtc {
         imageLiteralScale?: number; // button sizing between 0.6 and 2, default is 1
         weight?: number;
         parts?: string;
+        hiddenParts?: string; // allows an extesion to declaratively hide a part
         trackArgs?: number[];
         advanced?: boolean;
         deprecated?: boolean;
@@ -1048,6 +1044,7 @@ declare namespace ts.pxtc {
         extensionFiles: pxt.Map<string>;
         yotta?: pxt.YottaConfig;
         platformio?: pxt.PlatformIOConfig;
+        codal?: pxt.CodalJson;
         npmDependencies?: pxt.Map<string>;
         sha: string;
         compileData: string;

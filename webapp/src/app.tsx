@@ -4568,7 +4568,7 @@ export class ProjectView
         const hasIdentity = pxt.auth.hasIdentity();
         return (
             <div id='root' className={rootClasses}>
-                <extensionsBrowser.ExtensionsBrowser isVisible={this.state.extensionsVisible} hideExtensions={this.hidePackageDialog} header={this.state.header} reloadHeaderAsync={()=>{ return this.reloadHeaderAsync()}}/>
+                {this.state.extensionsVisible && <extensionsBrowser.ExtensionsBrowser hideExtensions={this.hidePackageDialog} header={this.state.header} reloadHeaderAsync={()=>{ return this.reloadHeaderAsync()}}/>}
                 {greenScreen ? <greenscreen.WebCam close={this.toggleGreenScreen} /> : undefined}
                 {accessibleBlocks && <accessibleblocks.AccessibleBlocksInfo />}
                 {hideMenuBar || inHome ? undefined :
@@ -4820,16 +4820,20 @@ function handleHash(newHash: { cmd: string; arg: string }, loading: boolean): bo
             return true;
         case "newproject": // shortcut to create a new blocks proj
             pxt.tickEvent("hash.newproject")
-            editor.newEmptyProject();
+            editor.newProject();
             pxt.BrowserUtils.changeHash("");
             return true;
         case "newjavascript": // shortcut to create a new JS proj
             pxt.tickEvent("hash.newjavascript");
             editor.newProject({
-                prj: pxt.appTarget.blocksprj,
-                filesOverride: {
-                    [pxt.MAIN_BLOCKS]: ""
-                }
+                preferredEditor: pxt.JAVASCRIPT_PROJECT_NAME
+            });
+            pxt.BrowserUtils.changeHash("");
+            return true;
+        case "newpython": // shortcut to create a new python proj
+            pxt.tickEvent("hash.newpython");
+            editor.newProject({
+                preferredEditor: pxt.PYTHON_PROJECT_NAME
             });
             pxt.BrowserUtils.changeHash("");
             return true;

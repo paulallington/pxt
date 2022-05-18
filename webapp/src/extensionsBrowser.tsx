@@ -3,21 +3,19 @@ import * as React from "react";
 import * as core from "./core";
 import * as workspace from "./workspace";
 import * as pkg from "./package";
+import * as codecard from "./codecard";
 
-import { MenuBar } from "../../react-common/components/controls/MenuBar";
 import { Button } from "../../react-common/components/controls/Button";
-import { workerOpAsync } from "./compiler";
 import { SearchInput } from "./components/searchInput";
 import { useState, useEffect } from "react";
 import { ImportModal } from "../../react-common/components/extensions/ImportModal";
-import { DeleteConfirmationModal } from "../../react-common/components/extensions/DeleteConfirmationModal";
-import { ExtensionCard } from "../../react-common/components/extensions/ExtensionCard";
+import { Modal } from "../../react-common/components/controls/Modal";
 
 type ExtensionMeta = pxtc.service.ExtensionMeta;
-const emptyCard = { name: "", loading: true }
+type EmptyCard = { name: string, loading?: boolean }
+const emptyCard: EmptyCard = { name: "", loading: true }
 
 interface ExtensionsProps {
-    isVisible: boolean;
     hideExtensions: () => void;
     header: pxt.workspace.Header;
     reloadHeaderAsync: () => Promise<void>;
@@ -25,70 +23,50 @@ interface ExtensionsProps {
 
 enum TabState {
     Recommended,
-    Installed,
     InDevelopment
 }
 
 export const ExtensionsBrowser = (props: ExtensionsProps) => {
 
     const [searchFor, setSearchFor] = useState("");
+    const [searchComplete, setSearchComplete] = useState(true)
     const [allExtensions, setAllExtensions] = useState(fetchBundled());
-    const [extensionsToShow, setExtensionsToShow] = useState([]);
+    const [extensionsToShow, setExtensionsToShow] = useState<(ExtensionMeta & EmptyCard)[]>([]);
     const [selectedTag, setSelectedTag] = useState("");
     const [currentTab, setCurrentTab] = useState(TabState.Recommended);
     const [showImportExtensionDialog, setShowImportExtensionDialog] = useState(false);
-    const [installedExtensions, setInstalledExtensions] = useState([])
-    const [lastVisibleState, setLastVisibleState] = useState(props.isVisible)
-    const [deletionCandidate, setDeletionCandidate] = useState(undefined)
-    const [preferredExts, setPreferredExts] = useState([])
+    const [preferredExts, setPreferredExts] = useState<(ExtensionMeta & EmptyCard)[]>([])
     const [extensionTags, setExtensionTags] = useState(new Map<string, pxt.RepoData[]>())
 
-    if (lastVisibleState != props.isVisible) {
-        updateInstalledExts();
-        updateExtensionTags();
-        setLastVisibleState(props.isVisible)
-        updatePreferredExts();
-        if (!props.isVisible) {
-            setCurrentTab(TabState.Recommended)
-            setSearchFor("")
-            setSelectedTag("")
-        }
-    }
-
-
     useEffect(() => {
-        updateInstalledExts();
+        updateExtensionTags();
+        updatePreferredExts();
     }, [])
 
     useEffect(() => {
         if (searchFor && searchFor != "") {
-            if (searchFor.indexOf("/") >= 0) {
-                searchForGithubAsync();
-            } else {
-                workerOpAsync("extensionSearch", {
-                    search: {
-                        term: searchFor
-                    },
-                    extensions: {
-                        srcs: Array.from(allExtensions.values())
-                    }
-                }).then(e => {
-                    setExtensionsToShow(e)
-                    setSelectedTag("")
-                })
-            }
+            searchForBundledAndGithubAsync();
         }
     }, [searchFor])
 
     /**
      * Github search
      */
-    async function searchForGithubAsync() {
+    async function searchForBundledAndGithubAsync() {
+        setSearchComplete(false)
         setExtensionsToShow([emptyCard, emptyCard, emptyCard, emptyCard])
         const exts = await fetchGithubDataAsync([searchFor])
         const parsedExt = exts.map(repo => parseGithubRepo(repo))
+        //Search bundled extensions as well
+        fetchBundled().forEach(e => {
+            if (e.name.toLowerCase().indexOf(searchFor.toLowerCase()) > -1) {
+                //Fuzzy search here?
+                parsedExt.unshift(e)
+            }
+        })
         addExtensionsToPool(parsedExt)
         setExtensionsToShow(parsedExt)
+        setSearchComplete(true)
     }
 
     function addExtensionsToPool(newExtension: ExtensionMeta[]) {
@@ -112,14 +90,6 @@ export const ExtensionsBrowser = (props: ExtensionsProps) => {
         const parsedGithubRepo = pxt.github.parseRepoId(extensionUrl)
         if (!parsedGithubRepo) return undefined;
         return allExtensions.get(parsedGithubRepo.slug.toLowerCase())
-    }
-
-    async function removeDepAsync(dep: ExtensionMeta) {
-        setDeletionCandidate(undefined)
-        props.hideExtensions()
-        await pkg.mainEditorPkg().removeDepAsync(dep.name)
-        await pxt.Util.delay(1000) // TODO VVN: Without a delay the reload still tries to load the extension
-        await props.reloadHeaderAsync()
     }
 
     async function addDepIfNoConflict(config: pxt.PackageConfig, version: string) {
@@ -186,16 +156,20 @@ export const ExtensionsBrowser = (props: ExtensionsProps) => {
     }
 
     async function fetchGithubDataAsync(preferredRepos: string[]): Promise<pxt.github.GitRepo[]> {
-        return data.getAsync<pxt.github.GitRepo[]>(`gh-search:${preferredRepos.join("|")}`);
+        // When searching multiple repos at the same time, use 'extension-search' which caches results
+        // for much longer than 'gh-search'
+        const virtualApi = preferredRepos.length == 1 ? 'gh-search' : 'extension-search';
+        return data.getAsync<pxt.github.GitRepo[]>(`${virtualApi}:${preferredRepos.join("|")}`);
     }
 
-    async function fetchGithubDataAndAddAsync(repos: string[], cb: (exts: ExtensionMeta[]) => void): Promise<void> {
+    async function fetchGithubDataAndAddAsync(repos: string[]): Promise<ExtensionMeta[]> {
         const fetched = await fetchGithubDataAsync(repos)
-        if (fetched) {
-            const parsed = fetched.map(r => parseGithubRepo(r))
-            addExtensionsToPool(parsed)
-            cb(parsed);
+        if (!fetched) {
+            return []
         }
+        const parsed = fetched.map(r => parseGithubRepo(r))
+        addExtensionsToPool(parsed)
+        return parsed;
     }
 
     function fetchLocalRepositories(): pxt.workspace.Header[] {
@@ -227,13 +201,16 @@ export const ExtensionsBrowser = (props: ExtensionsProps) => {
                 addGithubPackage(scr);
                 break;
         }
+    }
 
-        updateInstalledExts()
+    function ghName(scr: pxt.github.GitRepo) {
+        let n = scr.name.replace(/^pxt-/, "");
+        return n;
     }
 
     function parseGithubRepo(r: pxt.github.GitRepo): ExtensionMeta {
         return {
-            name: r.name,
+            name: ghName(r),
             type: pxtc.service.ExtensionType.Github,
             imageUrl: pxt.github.repoIconUrl(r),
             repo: r,
@@ -246,10 +223,6 @@ export const ExtensionsBrowser = (props: ExtensionsProps) => {
     function getCategoryNames(): string[] {
         if (!extensionTags) return [];
         return Array.from(extensionTags.keys())
-    }
-
-    function handleInstalledCardClick(src: ExtensionMeta) {
-        setDeletionCandidate(src)
     }
 
     async function handleCategoryClick(category: string) {
@@ -275,14 +248,15 @@ export const ExtensionsBrowser = (props: ExtensionsProps) => {
             }
         })
 
-        if (toBeFetched.length > 0) {
-            fetchGithubDataAndAddAsync(toBeFetched, (ext) => setExtensionsToShow([...extensionsWeHave, ...ext]))
-        }
         const loadingCards = []
         for (let i = 0; i < toBeFetched.length; i++) {
             loadingCards.push(emptyCard)
         }
         setExtensionsToShow([...extensionsWeHave, ...loadingCards]);
+        if (toBeFetched.length > 0) {
+            const exts = await fetchGithubDataAndAddAsync(toBeFetched)
+            setExtensionsToShow([...extensionsWeHave, ...exts])
+        }
     }
 
     function packageConfigToExtensionMeta(p: pxt.PackageConfig): ExtensionMeta {
@@ -307,13 +281,35 @@ export const ExtensionsBrowser = (props: ExtensionsProps) => {
             .map(k => JSON.parse(bundled[k]["pxt.json"]) as pxt.PackageConfig)
             .filter(pk => !pk.hidden)
             .filter(pk => !/---/.test(pk.name))
+            .filter(pk => !pk.searchOnly || searchFor?.length != 0)
             .filter(pk => pk.name != "core")
             .filter(pk => false == !!pk.core) // show core in "boards" mode
+            .filter(pk => !pkg.mainPkg.deps[pk.name] || pkg.mainPkg.deps[pk.name].cppOnly) // don't show package already referenced in extensions
+            .sort((a, b) => {
+                // core first
+                if (a.core != b.core)
+                    return a.core ? -1 : 1;
+
+                // non-beta first
+                const abeta = pxt.isPkgBeta(a);
+                const bbeta = pxt.isPkgBeta(b);
+                if (abeta != bbeta)
+                    return abeta ? 1 : -1;
+
+                // use weight if core packages
+                const aweight = a.weight === undefined ? 50 : a.weight;
+                const bweight = b.weight === undefined ? 50 : b.weight;
+                if (aweight != bweight)
+                    return -aweight + bweight;
+
+                // alphabetical sort
+                return pxt.Util.strcmp(a.name, b.name)
+            })
             .forEach(e => extensionsMap.set(e.name, packageConfigToExtensionMeta(e)))
         return extensionsMap
     }
 
-    function updatePreferredExts() {
+    async function updatePreferredExts() {
         const bundled = fetchBundled();
         const repos: ExtensionMeta[] = [];
         bundled.forEach(e => {
@@ -339,53 +335,17 @@ export const ExtensionsBrowser = (props: ExtensionsProps) => {
         }
         setPreferredExts([...repos, ...loadingCards])
 
-        fetchGithubDataAndAddAsync(toBeFetched, (exts) => setPreferredExts([...repos, ...exts]));
+        const exts = await fetchGithubDataAndAddAsync(toBeFetched);
+        setPreferredExts([...repos, ...exts])
     }
 
-    /**
-     * Loads installed extensions' info from Github
-     *
-     */
-     async function updateInstalledExts() {
-        const installed: ExtensionMeta[] = []
-        const reposToFetch: string[] = [];
-        Object.keys(pkg.mainPkg?.deps as Object).forEach((k) => {
-            if (k == "this" || k == "core") {
-                return;
-            }
-            const ext = pkg.mainPkg.deps[k];
-            if (ext?.installedVersion?.includes("github")) {
-                const match = /github:(\S*)#?/.exec(ext.installedVersion);
-                const repoName = match[1]
-
-                let fetchedRepo = getExtensionFromFetched(k);
-
-                if (fetchedRepo) {
-                    installed.push(fetchedRepo)
-                } else {
-                    reposToFetch.push(repoName)
-                }
-            } else {
-                installed.push({
-                    name: ext?.config?.name,
-                    imageUrl: ext?.config?.icon,
-                    description: ext?.config?.description
-                })
-            }
-        })
-
-        if (reposToFetch && reposToFetch.length > 0) {
-            fetchGithubDataAndAddAsync(reposToFetch, (ext) => setInstalledExtensions([...installed, ...ext]))
-        }
-        setInstalledExtensions(installed)
-    }
-
-    function handleImportUrl(url: string) {
+    async function handleImportUrl(url: string) {
         setShowImportExtensionDialog(false)
         props.hideExtensions()
         const ext = getExtensionFromFetched(url)
         if (!ext) {
-            fetchGithubDataAndAddAsync([url], (exts) => addExtensionsToPool(exts))
+            const exts = await fetchGithubDataAndAddAsync([url])
+            addExtensionsToPool(exts)
         } else {
             addGithubPackage(ext)
         }
@@ -408,71 +368,160 @@ export const ExtensionsBrowser = (props: ExtensionsProps) => {
 
     const categoryNames = getCategoryNames();
     const local = currentTab == TabState.InDevelopment ? fetchLocalRepositories() : undefined
+    return (
+        <Modal
+            title={lf("Extensions")}
+            fullscreen={true}
+            className={"extensions-browser"}
+            onClose={props.hideExtensions}
+            helpUrl={"/extensions"}
+        >
+            <div className="ui">
+                {showImportExtensionDialog &&
+                    <ImportModal
+                        onCancelClick={() => setShowImportExtensionDialog(false)}
+                        onImportClick={handleImportUrl}
+                    />
+                }
+                <div className="extension-search-header">
+                    <SearchInput
+                        ariaMessage={searchComplete && lf("{0} results matching '{1}'", extensionsToShow.length, searchFor)}
+                        placeholder={lf("Search or enter project URL...")}
+                        aria-label={lf("Search or enter project URL...")}
+                        searchHandler={setSearchFor} />
+                    <div className="extension-tags">
+                        {categoryNames.map(c =>
+                            <Button title={pxt.Util.rlf(c)}
+                                key={c}
+                                label={pxt.Util.rlf(c)}
+                                onClick={() => handleCategoryClick(c)}
+                                onKeydown={() => handleCategoryClick}
+                                className={"extension-tag " + (selectedTag == c ? "selected" : "")}
+                            />
+                        )}
+                    </div>
+                    {/* TODO bring in the import modal in later! <div className="importButton">
+                            <span>{lf("or ")}</span>
+                            <div className="importButtonLink" onClick={() => setShowImportExtensionDialog(true)}>{lf("import extension")}</div>
+                        </div> */}
+                </div>
+                {displayMode == ExtensionView.Search &&
+                    <div className="extension-display">
+                        <div className="breadcrumbs">
+                            <span className="link" onClick={handleHomeButtonClick}>{lf("Home")}</span>
+                        </div>
+                        <div className="ui cards left">
+                            {extensionsToShow?.map((scr, index) =>
+                                <ExtensionCard
+                                    key={`searched:${index}`}
+                                    name={scr.name ?? `${index}`}
+                                    description={scr.description}
+                                    imageUrl={scr.imageUrl}
+                                    scr={scr}
+                                    onCardClick={installExtension}
+                                    learnMoreUrl={scr.fullName ? `/pkg/${scr.fullName}` : undefined}
+                                    loading={scr.loading}
+                                    label={pxt.isPkgBeta(scr) ? lf("Beta") : undefined}
+                                    role="button"
+                                />)}
+                        </div>
+                        {searchComplete && extensionsToShow.length == 0 &&
+                            <div aria-label="Extension search results">
+                                <p>{lf("We couldn't find any extensions matching '{0}'", searchFor)}</p>
+                            </div>
+                        }
+                    </div>}
+                {displayMode == ExtensionView.Tags &&
+                    <div className="extension-display">
+                        <div className="breadcrumbs">
+                            <span className="link" onClick={handleHomeButtonClick}>{lf("Home")}</span>
+                            <span>/</span>
+                            <span>{selectedTag}</span>
+                        </div>
+                        <div className="ui cards left">
+                            {extensionsToShow?.map((scr, index) =>
+                                <ExtensionCard
+                                    key={`tagged:${index}`}
+                                    name={scr.name ?? `${index}`}
+                                    description={scr.description}
+                                    imageUrl={scr.imageUrl}
+                                    scr={scr}
+                                    onCardClick={installExtension}
+                                    learnMoreUrl={scr.fullName ? `/pkg/${scr.fullName}` : undefined}
+                                    loading={scr.loading}
+                                    label={pxt.isPkgBeta(scr) ? lf("Beta") : undefined}
+                                    role="button"
+                                />)}
+                        </div>
+                    </div>}
+                {displayMode == ExtensionView.Tabbed &&
+                    <div className="extension-display">
+                        <div className="tab-header">
+                            <Button
+                                key={"Recommended"}
+                                title={lf("Recommended")}
+                                label={lf("Recommended")}
+                                onClick={() => { setCurrentTab(TabState.Recommended) }}
+                                className={currentTab == TabState.Recommended ? "selected" : ""}
+                            />
+                            <Button
+                                key={"In Development"}
+                                title={lf("In Development")}
+                                label={lf("In Development")}
+                                onClick={() => { setCurrentTab(TabState.InDevelopment) }}
+                                className={currentTab == TabState.InDevelopment ? "selected" : ""}
+                            />
+                        </div>
+                        <div className="ui cards left">
+                            {currentTab == TabState.Recommended && preferredExts.map((e, index) =>
+                                <ExtensionCard
+                                    key={`preferred:${index}`}
+                                    scr={e}
+                                    name={e.name ?? `${index}`}
+                                    onCardClick={installExtension}
+                                    imageUrl={e.imageUrl}
+                                    description={e.description}
+                                    learnMoreUrl={e.fullName ? `/pkg/${e.fullName}` : undefined}
+                                    loading={e.loading}
+                                    label={pxt.isPkgBeta(e) ? lf("Beta") : undefined}
+                                    role="button"
+                                />
+                            )
+                            }
+                            {currentTab == TabState.InDevelopment && local.forEach((p, index) =>
+                                <ExtensionCard
+                                    key={`local:${index}`}
+                                    name={p.name}
+                                    description={lf("Local copy of {0} hosted on github.com", p.githubId)}
+                                    url={"https://github.com/" + p.githubId}
+                                    imageUrl={p.icon}
+                                    scr={p}
+                                    onCardClick={addLocal}
+                                    label={lf("Local")}
+                                    title={lf("Local GitHub extension")}
+                                    labelClass="blue right ribbon"
+                                    role="button"
+                                />
+                            )
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        </Modal>
+    )
+}
 
-    return <div className={`extensionsBrowser ${props.isVisible ? "" : "hide"}`} >
-        {showImportExtensionDialog ? <ImportModal onCancelClick={() => setShowImportExtensionDialog(false)} onImportClick={handleImportUrl} /> : undefined}
-        {deletionCandidate ? <DeleteConfirmationModal ns={deletionCandidate.name} onCancelClick={() => { setDeletionCandidate(undefined) }} onDeleteClick={() => { removeDepAsync(deletionCandidate)}} /> : undefined}
-        <MenuBar className="extensionsHeader" ariaLabel={lf("Extentions")}>
-            <div className="header-left">
-                <Button className="menu-button" leftIcon="fas fa-arrow-left large" title={lf("Back")} label={lf("Back")} onClick={props.hideExtensions} />
-            </div>
-            <div className="header-center">
-                {lf("Extensions")}
-            </div>
-            <div className="header-right"></div>
-        </MenuBar>
-        <div className="extensionSearchHeader">
-            <div className="header">{(lf("Do more with your micro:bit"))}</div>
-            <SearchInput searchHandler={setSearchFor} />
-            <div className="extensionTags">
-                {categoryNames.map(c =>
-                    <div className={"extensionTag " + (selectedTag == c ? "selected" : "")} onClick={() => handleCategoryClick(c)}>{c}</div>
-                )}
-            </div>
-            {/* TODO bring in the import modal in later! <div className="importButton">
-                <span>{lf("or ")}</span>
-                <div className="importButtonLink" onClick={() => setShowImportExtensionDialog(true)}>{lf("import extension")}</div>
-            </div> */}
-        </div>
-        {displayMode == ExtensionView.Search &&
-            <div className="extension-display">
-                <div className="breadcrumbs">
-                    <span className="link" onClick={handleHomeButtonClick}>{lf("Home")}</span>
-                </div>
-                <div className="extension-grid">
-                    {extensionsToShow?.map(scr =>
-                        <ExtensionCard scr={scr} onCardClick={installExtension} learnMoreUrl={scr.fullName ? `/pkg/${scr.fullName}` : undefined}
-                            name={scr.name} imageUrl={scr.imageUrl} description={scr.description} loading={scr.loading} />)}
-                </div>
-            </div>}
-        {displayMode == ExtensionView.Tags &&
-            <div className="extension-display">
-                <div className="breadcrumbs">
-                    <span className="link" onClick={handleHomeButtonClick}>{lf("Home")}</span>
-                    <span>/</span>
-                    <span>{selectedTag}</span>
-                </div>
-                <div className="extension-grid">
-                    {extensionsToShow?.map(scr =>
-                        <ExtensionCard scr={scr} onCardClick={installExtension} learnMoreUrl={scr.fullName ? `/pkg/${scr.fullName}` : undefined}
-                            name={scr.name} imageUrl={scr.imageUrl} description={scr.description} loading={scr.loading} />)}
-                </div>
-            </div>}
-        {displayMode == ExtensionView.Tabbed &&
-            <div className="extension-display">
-                <div className="tab-header">
-                        <Button title={lf("Recommended")} label={lf("Recommended")} onClick={() => { setCurrentTab(TabState.Recommended) }} className={currentTab == TabState.Recommended ? "selected" : ""} />
-                        <Button title={lf("Installed")} label={lf("Installed")} onClick={() => { setCurrentTab(TabState.Installed) }} className={currentTab == TabState.Installed ? "selected" : ""} />
-                        <Button title={lf("In Development")} label={lf("In Development")} onClick={() => { setCurrentTab(TabState.InDevelopment) }} className={currentTab == TabState.InDevelopment ? "selected" : ""} />
-                </div>
-                {currentTab == TabState.Recommended && preferredExts.map(e => <ExtensionCard scr={e} name={e.name} onCardClick={installExtension} imageUrl={e.imageUrl} description={e.description}
-                        learnMoreUrl={e.fullName ? `/pkg/${e.fullName}`: undefined} loading={e.loading} />)}
-                {currentTab == TabState.Installed && installedExtensions.map(e =>
-                        <ExtensionCard scr={e} name={e.name} onCardClick={() => handleInstalledCardClick(e)} imageUrl={e.imageUrl} description={e.description} learnMoreUrl={e.fullName ? `/pkg/${e.fullName}` : undefined}/>)}
-                {currentTab == TabState.InDevelopment && local.forEach(p => {
-                            <ExtensionCard scr={p} name={p.name} description={lf("Local copy of {0} hosted on github.com", p.githubId)} onCardClick={addLocal} />
-                        })}
-            </div>
-        }
-    </div>
+interface ExtensionCardProps extends pxt.CodeCard {
+    scr: pxtc.service.ExtensionMeta;
+    onCardClick: (scr: any) => void;
+    loading?: boolean;
+}
+
+const ExtensionCard = (props: ExtensionCardProps) => {
+    const handleClick = () => {
+        props.onCardClick(props.scr);
+    }
+
+    return <codecard.CodeCardView {...props} onClick={handleClick} key={props.name} />
 }
