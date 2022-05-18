@@ -389,17 +389,17 @@ export const ExtensionsBrowser = (props: ExtensionsProps) => {
                         placeholder={lf("Search or enter project URL...")}
                         aria-label={lf("Search or enter project URL...")}
                         searchHandler={setSearchFor} />
-                    <div className="extension-tags">
-                        {categoryNames.map(c =>
-                            <Button title={pxt.Util.rlf(c)}
-                                key={c}
-                                label={pxt.Util.rlf(c)}
-                                onClick={() => handleCategoryClick(c)}
-                                onKeydown={() => handleCategoryClick}
-                                className={"extension-tag " + (selectedTag == c ? "selected" : "")}
-                            />
-                        )}
-                    </div>
+                    {/*<div className="extension-tags">*/}
+                    {/*    {categoryNames.map(c =>*/}
+                    {/*        <Button title={pxt.Util.rlf(c)}*/}
+                    {/*            key={c}*/}
+                    {/*            label={pxt.Util.rlf(c)}*/}
+                    {/*            onClick={() => handleCategoryClick(c)}*/}
+                    {/*            onKeydown={() => handleCategoryClick}*/}
+                    {/*            className={"extension-tag " + (selectedTag == c ? "selected" : "")}*/}
+                    {/*        />*/}
+                    {/*    )}*/}
+                    {/*</div>*/}
                     {/* TODO bring in the import modal in later! <div className="importButton">
                             <span>{lf("or ")}</span>
                             <div className="importButtonLink" onClick={() => setShowImportExtensionDialog(true)}>{lf("import extension")}</div>
