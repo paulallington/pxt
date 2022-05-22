@@ -515,6 +515,20 @@ export async function saveAsync(h: Header, text?: ScriptText, fromCloudSync?: bo
         allScripts.push(e)
     }
 
+    const saveTimeExpired = () => {
+
+        if (U.nowSeconds() - h.modificationTime < pxt.appTarget.appTheme.secsBetweenSaves) {
+            return false
+        }
+
+        return true
+    }
+
+    if (!saveTimeExpired()) {
+        console.log(`Not saving due to save being less than ${pxt.appTarget.appTheme.secsBetweenSaves} seconds ago`);
+        return Promise.resolve()
+    }
+
     const hasUserFileChanges = () => {
         // we see lots of frequent "saves" that don't come from real changes made by the user. This
         // causes problems for cloud sync since this can cause us to think the user is making when
@@ -542,6 +556,26 @@ export async function saveAsync(h: Header, text?: ScriptText, fromCloudSync?: bo
 
         return hasUserChanges;
     }
+
+    // Check for undefined in save object as that means there may be a corruption
+    const corruptionDetected = () => {
+        console.log("Data to validate")
+        console.log(text)
+
+        for (let key in text) {
+            if (key == "undefined") {
+                console.log(`Corruption detected in key: ${key}`);
+                return true;
+            }
+        }
+
+        return false
+    }
+
+    if (corruptionDetected()){
+        return Promise.resolve()
+    }
+
     const isHeaderOnlyChange = !fromCloudSync && !text;
     const isUserChange = !fromCloudSync
         && (h.isDeleted || text && hasUserFileChanges())
@@ -587,6 +621,7 @@ export async function saveAsync(h: Header, text?: ScriptText, fromCloudSync?: bo
     }
 
     return headerQ.enqueue<void>(h.id, async () => {
+        console.log("Sending save to storage")
         await fixupVersionAsync(e);
         let ver: any;
 
