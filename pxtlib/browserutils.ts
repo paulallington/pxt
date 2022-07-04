@@ -1,6 +1,10 @@
 namespace pxt.BrowserUtils {
     import Util = pxt.Util;
 
+    export function isDocumentVisible() {
+        return typeof window !== "undefined" && document.visibilityState === 'visible'
+    }
+
     export function isIFrame(): boolean {
         let query = Util.parseQueryString(window.location.href);
         console.log(`Run as edditor: ${query['editor']}`);

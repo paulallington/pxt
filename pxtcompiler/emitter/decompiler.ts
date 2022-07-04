@@ -748,31 +748,7 @@ ${output}</xml>`;
         function emitValueNode(n: ValueNode) {
             write(`<value name="${n.name}">`)
 
-            let emitShadowOnly = false;
-
-            if (n.value.kind === "expr") {
-                const value = n.value as ExpressionNode;
-                if (value.type === numberType && n.shadowType === minmaxNumberType) {
-                    value.type = minmaxNumberType;
-                    value.fields[0].name = 'SLIDER';
-                    value.mutation = n.shadowMutation;
-                }
-                emitShadowOnly = value.type === n.shadowType;
-                if (!emitShadowOnly) {
-                    switch (value.type) {
-                        case "math_number":
-                        case "math_number_minmax":
-                        case "math_integer":
-                        case "math_whole_number":
-                        case "logic_boolean":
-                        case "text":
-                            emitShadowOnly = !n.shadowType;
-                            break
-                    }
-                }
-            }
-
-            if (emitShadowOnly) {
+            if (shouldEmitShadowOnly(n)) {
                 emitOutputNode(n.value, true);
             }
             else {
@@ -1290,6 +1266,111 @@ ${output}</xml>`;
             return undefined;
         }
 
+        /**
+         * We split up comments according to the following rules:
+         *      1. If the comment is not top-level:
+         *          a. Combine it with all comments for the following statement
+         *          b. If there is no following statement in the current block, group it with the previous statement
+         *          c. If there are no statements inside the block, group it with the parent block
+         *          d. If trailing the same line as the statement, group it with the comments for that statement
+         *      2. If the comment is top-level:
+         *          b. If the comment is followed by an empty line, it becomes a workspace comment
+         *          c. If the comment is followed by a multi-line comment, it becomes a workspace comment
+         *          a. If the comment is a single-line comment, combine it with the next single-line comment
+         *          d. If the comment is not followed with an empty line, group it with the next statement or event
+         *          e. All other comments are workspace comments
+         *
+         * The below function gathers any comments associated to the Node, and attaches them
+         * to the StatementNode.
+         */
+        function getNodeComments(commented: Node, stmt: StatementNode) {
+            let comments: Comment[] = [];
+            let current: Comment;
+            for (let i = 0; i < commentMap.length; i++) {
+                current = commentMap[i];
+                if (!current.owner && current.start >= commented.pos && current.end <= commented.end) {
+                    current.owner = commented;
+                    current.ownerStatement = stmt;
+                    comments.push(current);
+                }
+
+                if (current.start > commented.end) break;
+            }
+
+            if (current && current.isTrailingComment) {
+                const endLine = ts.getLineAndCharacterOfPosition(file, commented.end);
+                const commentLine = ts.getLineAndCharacterOfPosition(file, current.start);
+
+                if (endLine.line === commentLine.line) {
+                    // If the comment is trailing and on the same line as the statement, it probably belongs
+                    // to this statement. Remove it from any statement it's already assigned to and any workspace
+                    // comments
+                    if (current.ownerStatement) {
+                        current.ownerStatement.comment.splice(current.ownerStatement.comment.indexOf(current), 1);
+
+                        for (const wsComment of workspaceComments) {
+                            wsComment.comment.splice(wsComment.comment.indexOf(current), 1)
+                        }
+                    }
+                    current.owner = commented;
+                    current.ownerStatement = stmt;
+                    comments.push(current);
+                }
+            }
+
+            if (comments.length) {
+                const wsCommentRefs: string[] = [];
+
+                if (isTopLevelComment(commented)) {
+                    let currentWorkspaceComment: Comment[] = [];
+
+                    const localWorkspaceComments: Comment[][] = [];
+
+                    comments.forEach((comment, index) => {
+                        let beforeStatement = comment.owner && comment.start < comment.owner.getStart();
+                        if (comment.kind === CommentKind.MultiLine && beforeStatement) {
+                            if (currentWorkspaceComment.length) {
+                                localWorkspaceComments.push(currentWorkspaceComment);
+                                currentWorkspaceComment = [];
+                            }
+                            if (index != comments.length - 1) {
+                                localWorkspaceComments.push([comment]);
+                                return;
+                            }
+                        }
+
+                        currentWorkspaceComment.push(comment);
+
+                        if (comment.followedByEmptyLine && beforeStatement) {
+                            localWorkspaceComments.push(currentWorkspaceComment);
+                            currentWorkspaceComment = [];
+                        }
+                    });
+
+                    comments = currentWorkspaceComment;
+
+                    localWorkspaceComments.forEach(comment => {
+                        const refId = getCommentRef();
+
+                        wsCommentRefs.push(refId);
+                        workspaceComments.push({ comment, refId });
+                    });
+                }
+
+                // Attach comments to StatementNode
+                if (stmt) {
+                    if (wsCommentRefs.length) {
+                        if (stmt.data) stmt.data += ";" + wsCommentRefs.join(";")
+                        else stmt.data = wsCommentRefs.join(";")
+                    }
+                    if (comments && comments.length) {
+                        if (stmt.comment) stmt.comment = stmt.comment.concat(comments);
+                        else stmt.comment = comments;
+                    }
+                }
+            }
+        }
+
         function getStatementBlock(n: ts.Node, next?: ts.Node[], parent?: ts.Node, asExpression = false, topLevel = false): StatementNode {
             const node = n as ts.Node;
             let stmt: StatementNode;
@@ -1396,7 +1477,7 @@ ${output}</xml>`;
             }
 
             if (!skipComments) {
-                getComments(parent || node);
+                getNodeComments(parent || node, stmt);
             }
 
             return stmt;
@@ -1406,108 +1487,6 @@ ${output}</xml>`;
                     return getStatementBlock(next.shift(), next, undefined, false, topLevel);
                 }
                 return undefined;
-            }
-
-            /**
-             * We split up comments according to the following rules:
-             *      1. If the comment is not top-level:
-             *          a. Combine it with all comments for the following statement
-             *          b. If there is no following statement in the current block, group it with the previous statement
-             *          c. If there are no statements inside the block, group it with the parent block
-             *          d. If trailing the same line as the statement, group it with the comments for that statement
-             *      2. If the comment is top-level:
-             *          b. If the comment is followed by an empty line, it becomes a workspace comment
-             *          c. If the comment is followed by a multi-line comment, it becomes a workspace comment
-             *          a. If the comment is a single-line comment, combine it with the next single-line comment
-             *          d. If the comment is not followed with an empty line, group it with the next statement or event
-             *          e. All other comments are workspace comments
-             */
-
-            function getComments(commented: Node) {
-                let comments: Comment[] = [];
-                let current: Comment;
-                for (let i = 0; i < commentMap.length; i++) {
-                    current = commentMap[i];
-                    if (!current.owner && current.start >= commented.pos && current.end <= commented.end) {
-                        current.owner = commented;
-                        current.ownerStatement = stmt;
-                        comments.push(current);
-                    }
-
-                    if (current.start > commented.end) break;
-                }
-
-                if (current && current.isTrailingComment) {
-                    const endLine = ts.getLineAndCharacterOfPosition(file, commented.end);
-                    const commentLine = ts.getLineAndCharacterOfPosition(file, current.start);
-
-                    if (endLine.line === commentLine.line) {
-                        // If the comment is trailing and on the same line as the statement, it probably belongs
-                        // to this statement. Remove it from any statement it's already assigned to and any workspace
-                        // comments
-                        if (current.ownerStatement) {
-                            current.ownerStatement.comment.splice(current.ownerStatement.comment.indexOf(current), 1);
-
-                            for (const wsComment of workspaceComments) {
-                                wsComment.comment.splice(wsComment.comment.indexOf(current), 1)
-                            }
-                        }
-                        current.owner = commented;
-                        current.ownerStatement = stmt;
-                        comments.push(current);
-                    }
-                }
-
-                if (comments.length) {
-                    const wsCommentRefs: string[] = [];
-
-                    if (isTopLevelComment(commented)) {
-                        let currentWorkspaceComment: Comment[] = [];
-
-                        const localWorkspaceComments: Comment[][] = [];
-
-                        comments.forEach((comment, index) => {
-                            let beforeStatement = comment.owner && comment.start < comment.owner.getStart();
-                            if (comment.kind === CommentKind.MultiLine && beforeStatement) {
-                                if (currentWorkspaceComment.length) {
-                                    localWorkspaceComments.push(currentWorkspaceComment);
-                                    currentWorkspaceComment = [];
-                                }
-                                if (index != comments.length - 1) {
-                                    localWorkspaceComments.push([comment]);
-                                    return;
-                                }
-                            }
-
-                            currentWorkspaceComment.push(comment);
-
-                            if (comment.followedByEmptyLine && beforeStatement) {
-                                localWorkspaceComments.push(currentWorkspaceComment);
-                                currentWorkspaceComment = [];
-                            }
-                        });
-
-                        comments = currentWorkspaceComment;
-
-                        localWorkspaceComments.forEach(comment => {
-                            const refId = getCommentRef();
-
-                            wsCommentRefs.push(refId);
-                            workspaceComments.push({ comment, refId });
-                        });
-                    }
-
-                    if (stmt) {
-                        if (wsCommentRefs.length) {
-                            if (stmt.data) stmt.data += ";" + wsCommentRefs.join(";")
-                            else stmt.data = wsCommentRefs.join(";")
-                        }
-                        if (comments && comments.length) {
-                            if (stmt.comment) stmt.comment = stmt.comment.concat(comments);
-                            else stmt.comment = comments;
-                        }
-                    }
-                }
             }
         }
 
@@ -2138,7 +2117,6 @@ ${output}</xml>`;
                 switch (e.kind) {
                     case SK.FunctionExpression:
                     case SK.ArrowFunction:
-                        let expBody = (e as ArrowFunction | FunctionExpression).body;
                         const m = getDestructuringMutation(e as ArrowFunction);
                         let mustPopLocalScope = false;
                         if (m) {
@@ -2271,7 +2249,23 @@ ${output}</xml>`;
                 if (!r.mutation) r.mutation = {};
 
                 if (attributes.compileHiddenArguments) {
-                    r.mutation["_expanded"] =  "0";
+                    // Only expand the optional arguments that do not map to shadow blocks
+                    let nonOptional = 0;
+                    let expandCount = 0;
+
+                    for (const arg of args) {
+                        const aName = U.htmlEscape(arg.param.definitionName);
+                        const input = r.inputs.find(i => i.name === aName);
+
+                        if (!arg.param.isOptional) {
+                            nonOptional++;
+                        }
+                        else if (input && !shouldEmitShadowOnly(input)) {
+                            expandCount = Math.max(arg.param.definitionIndex - nonOptional + 1, expandCount)
+                        }
+                    }
+
+                    r.mutation["_expanded"] =  expandCount.toString();
                 }
                 else {
                     r.mutation["_expanded"] = optionalCount.toString();
@@ -2379,12 +2373,13 @@ ${output}</xml>`;
 
             if (blockStatements.length) {
                 // wrap statement in "on start" if top level
-                const stmtNode = blockStatements.shift();
-                const stmt = getStatementBlock(stmtNode, blockStatements, parent, false, topLevel);
+                const blockNode = blockStatements.shift();
+                const stmt = getStatementBlock(blockNode, blockStatements, parent, false, topLevel);
                 if (emitOnStart) {
                     // Preserve any variable edeclarations that were never used
-                    let current = stmt;
-                    let currentNode: ts.Node = stmtNode;
+                    // stmt and blockNode will not yet align if there was an auto-declared variable.
+                    let currentStmtNode = stmt;
+                    let currentBlockNode: ts.Node = blockNode;
                     autoDeclarations.forEach(([name, node]) => {
                         if (varUsages[name] === ReferenceType.InBlocksOnly) {
                             return;
@@ -2398,18 +2393,24 @@ ${output}</xml>`;
                             v = getTypeScriptStatementBlock(node, "let ");
                         }
                         else {
-                            v = getVariableSetOrChangeBlock(stmtNode, (node as ts.VariableDeclaration).name as ts.Identifier, (node as ts.VariableDeclaration).initializer, false, true);
+                            v = getVariableSetOrChangeBlock(blockNode, (node as ts.VariableDeclaration).name as ts.Identifier, (node as ts.VariableDeclaration).initializer, false, true);
                         }
-                        v.next = current;
-                        current = v;
-                        currentNode = node;
+
+                        // Auto-declared variables were not previously inserted into the stmt linked-list.
+                        // Insert auto-declared 'v' as the currentStmtNode.
+                        v.next = currentStmtNode;
+                        currentStmtNode = v;
+                        currentBlockNode = node;
+
+                        // Attach to currentStmtNode any associated comments
+                        getNodeComments(currentBlockNode.parent, currentStmtNode);
                     });
 
-                    if (current) {
-                        const r = mkStmt(ts.pxtc.ON_START_TYPE, currentNode);
+                    if (currentStmtNode) {
+                        const r = mkStmt(ts.pxtc.ON_START_TYPE, currentBlockNode);
                         r.handlers = [{
                             name: "HANDLER",
-                            statement: current
+                            statement: currentStmtNode
                         }];
                         return r;
                     }
@@ -3876,5 +3877,33 @@ ${output}</xml>`;
                 current.owner = node;
             }
         }
+    }
+
+    function shouldEmitShadowOnly(n: ValueNode) {
+        let emitShadowOnly = false;
+
+        if (n.value.kind === "expr") {
+            const value = n.value as ExpressionNode;
+            if (value.type === numberType && n.shadowType === minmaxNumberType) {
+                value.type = minmaxNumberType;
+                value.fields[0].name = 'SLIDER';
+                value.mutation = n.shadowMutation;
+            }
+            emitShadowOnly = value.type === n.shadowType;
+            if (!emitShadowOnly) {
+                switch (value.type) {
+                    case "math_number":
+                    case "math_number_minmax":
+                    case "math_integer":
+                    case "math_whole_number":
+                    case "logic_boolean":
+                    case "text":
+                        emitShadowOnly = !n.shadowType;
+                        break
+                }
+            }
+        }
+
+        return emitShadowOnly;
     }
 }

@@ -3,13 +3,14 @@ import * as React from "react";
 import * as core from "./core";
 import * as workspace from "./workspace";
 import * as pkg from "./package";
-import * as codecard from "./codecard";
 
 import { Button } from "../../react-common/components/controls/Button";
-import { SearchInput } from "./components/searchInput";
-import { useState, useEffect } from "react";
+import { Input } from "../../react-common/components/controls/Input";
+import { useState, useEffect, useMemo } from "react";
 import { ImportModal } from "../../react-common/components/extensions/ImportModal";
+import { ExtensionCard } from "../../react-common/components/extensions/ExtensionCard";
 import { Modal } from "../../react-common/components/controls/Modal";
+import { classList } from "../../react-common/components/util";
 
 type ExtensionMeta = pxtc.service.ExtensionMeta;
 type EmptyCard = { name: string, loading?: boolean }
@@ -17,6 +18,7 @@ const emptyCard: EmptyCard = { name: "", loading: true }
 
 interface ExtensionsProps {
     hideExtensions: () => void;
+    importExtensionCallback: () => void;
     header: pxt.workspace.Header;
     reloadHeaderAsync: () => Promise<void>;
 }
@@ -31,12 +33,13 @@ export const ExtensionsBrowser = (props: ExtensionsProps) => {
     const [searchFor, setSearchFor] = useState("");
     const [searchComplete, setSearchComplete] = useState(true)
     const [allExtensions, setAllExtensions] = useState(fetchBundled());
+    const extensionsInDevelopment = useMemo(() => fetchLocalRepositories(), []);
     const [extensionsToShow, setExtensionsToShow] = useState<(ExtensionMeta & EmptyCard)[]>([]);
     const [selectedTag, setSelectedTag] = useState("");
     const [currentTab, setCurrentTab] = useState(TabState.Recommended);
     const [showImportExtensionDialog, setShowImportExtensionDialog] = useState(false);
     const [preferredExts, setPreferredExts] = useState<(ExtensionMeta & EmptyCard)[]>([])
-    const [extensionTags, setExtensionTags] = useState(new Map<string, pxt.RepoData[]>())
+    const [extensionTags, setExtensionTags] = useState(new Map<string, string[]>())
 
     useEffect(() => {
         updateExtensionTags();
@@ -53,6 +56,7 @@ export const ExtensionsBrowser = (props: ExtensionsProps) => {
      * Github search
      */
     async function searchForBundledAndGithubAsync() {
+        setSelectedTag("")
         setSearchComplete(false)
         setExtensionsToShow([emptyCard, emptyCard, emptyCard, emptyCard])
         const exts = await fetchGithubDataAsync([searchFor])
@@ -95,7 +99,7 @@ export const ExtensionsBrowser = (props: ExtensionsProps) => {
     async function addDepIfNoConflict(config: pxt.PackageConfig, version: string) {
         try {
             props.hideExtensions();
-            core.showLoading("installingextension", lf("Installing extension..."))
+            core.showLoading("installingextension", lf("Adding extension..."))
             const added = await pkg.mainEditorPkg()
                 .addDependencyAsync({ ...config, isExtension: true }, version, false)
             if (added) {
@@ -109,23 +113,23 @@ export const ExtensionsBrowser = (props: ExtensionsProps) => {
     }
 
 
-    function updateExtensionTags() {
+    async function updateExtensionTags() {
         if (extensionTags.size > 0)
             return
-        let trgConfigFetch = data.getDataWithStatus("target-config:");
-        let trgConfig = trgConfigFetch.data as pxt.TargetConfig;
-        if (!trgConfig || !trgConfig.packages || !trgConfig.packages.preferredRepoLib)
+        let trgConfig = await data.getAsync<pxt.TargetConfig>("target-config:")
+        if (!trgConfig?.packages?.approvedRepoLib)
             return;
-        const allRepos = [...trgConfig.packages.preferredRepoLib, ...trgConfig.packages.approvedRepoLib]
-        const newMap = extensionTags
-        allRepos.forEach(repo => {
-            repo.tags?.forEach(tag => {
+        const newMap = extensionTags;
+        Object.keys(trgConfig.packages.approvedRepoLib).forEach(repoSlug => {
+            const repoData = trgConfig.packages.approvedRepoLib[repoSlug];
+            repoData.tags?.forEach(tag => {
                 if (!newMap.has(tag)) {
                     newMap.set(tag, [])
                 }
-                const repos = newMap.get(tag)
-                if (!repos.find(r => r.slug.toLowerCase() == repo.slug.toLowerCase()))
-                    newMap.set(tag, [...newMap.get(tag), repo])
+                const tagRepos = newMap.get(tag)
+                if (tagRepos.indexOf(repoSlug) === -1) {
+                    tagRepos.push(repoSlug);
+                }
             })
         })
         setExtensionTags(newMap)
@@ -158,7 +162,7 @@ export const ExtensionsBrowser = (props: ExtensionsProps) => {
     async function fetchGithubDataAsync(preferredRepos: string[]): Promise<pxt.github.GitRepo[]> {
         // When searching multiple repos at the same time, use 'extension-search' which caches results
         // for much longer than 'gh-search'
-        const virtualApi = preferredRepos.length == 1 ? 'gh-search' : 'extension-search';
+        const virtualApi = preferredRepos.length <= 1 ? 'gh-search' : 'extension-search';
         return data.getAsync<pxt.github.GitRepo[]>(`${virtualApi}:${preferredRepos.join("|")}`);
     }
 
@@ -203,6 +207,12 @@ export const ExtensionsBrowser = (props: ExtensionsProps) => {
         }
     }
 
+    function importExtension() {
+        pxt.tickEvent("extensions.import", undefined, { interactiveConsent: true });
+        props.hideExtensions()
+        props.importExtensionCallback()
+    }
+
     function ghName(scr: pxt.github.GitRepo) {
         let n = scr.name.replace(/^pxt-/, "");
         return n;
@@ -239,10 +249,10 @@ export const ExtensionsBrowser = (props: ExtensionsProps) => {
         const toBeFetched: string[] = []
         const extensionsWeHave: ExtensionMeta[] = []
 
-        categoryExtensions.forEach(e => {
-            const fetched = getExtensionFromFetched(e.slug);
+        categoryExtensions.forEach(repoSlug => {
+            const fetched = getExtensionFromFetched(repoSlug);
             if (!fetched) {
-                toBeFetched.push(e.slug)
+                toBeFetched.push(repoSlug)
             } else {
                 extensionsWeHave.push(fetched)
             }
@@ -264,6 +274,7 @@ export const ExtensionsBrowser = (props: ExtensionsProps) => {
             name: p.name,
             imageUrl: p.icon,
             type: pxtc.service.ExtensionType.Bundled,
+            learnMoreUrl: `/reference/${p.name}`,
             pkgConfig: p,
             description: p.description
         }
@@ -315,17 +326,19 @@ export const ExtensionsBrowser = (props: ExtensionsProps) => {
         bundled.forEach(e => {
             repos.push(e)
         })
-        let trgConfigFetch = data.getDataWithStatus("target-config:");
-        let trgConfig = trgConfigFetch.data as pxt.TargetConfig;
+        let trgConfig = await data.getAsync<pxt.TargetConfig>("target-config:")
 
         const toBeFetched: string[] = [];
-        if (trgConfig && trgConfig.packages && trgConfig.packages.preferredRepoLib) {
-            trgConfig.packages.preferredRepoLib.forEach(r => {
-                const fetched = getExtensionFromFetched(r.slug)
+        if (trgConfig?.packages?.approvedRepoLib) {
+            Object.keys(trgConfig.packages.approvedRepoLib).forEach(repoSlug => {
+                const repoData = trgConfig.packages.approvedRepoLib[repoSlug];
+                if (!repoData.preferred)
+                    return;
+                const fetched = getExtensionFromFetched(repoSlug);
                 if (fetched) {
-                    repos.push(fetched)
+                    repos.push(fetched);
                 } else {
-                    toBeFetched.push(r.slug)
+                    toBeFetched.push(repoSlug);
                 }
             })
         }
@@ -367,7 +380,11 @@ export const ExtensionsBrowser = (props: ExtensionsProps) => {
     }
 
     const categoryNames = getCategoryNames();
-    const local = currentTab == TabState.InDevelopment ? fetchLocalRepositories() : undefined
+
+    const onSearchBarChange = (newValue: string) => {
+        setSearchFor(newValue || "");
+    }
+
     return (
         <Modal
             title={lf("Extensions")}
@@ -384,144 +401,147 @@ export const ExtensionsBrowser = (props: ExtensionsProps) => {
                     />
                 }
                 <div className="extension-search-header">
-                    <SearchInput
-                        ariaMessage={searchComplete && lf("{0} results matching '{1}'", extensionsToShow.length, searchFor)}
+                    <Input
                         placeholder={lf("Search or enter project URL...")}
-                        aria-label={lf("Search or enter project URL...")}
-                        searchHandler={setSearchFor} />
-                    {/*<div className="extension-tags">*/}
-                    {/*    {categoryNames.map(c =>*/}
-                    {/*        <Button title={pxt.Util.rlf(c)}*/}
-                    {/*            key={c}*/}
-                    {/*            label={pxt.Util.rlf(c)}*/}
-                    {/*            onClick={() => handleCategoryClick(c)}*/}
-                    {/*            onKeydown={() => handleCategoryClick}*/}
-                    {/*            className={"extension-tag " + (selectedTag == c ? "selected" : "")}*/}
-                    {/*        />*/}
-                    {/*    )}*/}
-                    {/*</div>*/}
+                        ariaLabel={lf("Search or enter project URL...")}
+                        initialValue={searchFor}
+                        onEnterKey={onSearchBarChange}
+                        onBlur={onSearchBarChange}
+                        icon="fas fa-search"
+                    />
+                    <div className="extension-tags">
+                        {categoryNames.map(c =>
+                            <Button title={pxt.Util.rlf(c)}
+                                key={c}
+                                label={pxt.Util.rlf(c)}
+                                onClick={() => handleCategoryClick(c)}
+                                onKeydown={() => handleCategoryClick}
+                                className={"extension-tag " + (selectedTag == c ? "selected" : "")}
+                            />
+                        )}
+                    </div>
                     {/* TODO bring in the import modal in later! <div className="importButton">
                             <span>{lf("or ")}</span>
                             <div className="importButtonLink" onClick={() => setShowImportExtensionDialog(true)}>{lf("import extension")}</div>
                         </div> */}
                 </div>
-                {displayMode == ExtensionView.Search &&
-                    <div className="extension-display">
-                        <div className="breadcrumbs">
-                            <span className="link" onClick={handleHomeButtonClick}>{lf("Home")}</span>
-                        </div>
-                        <div className="ui cards left">
-                            {extensionsToShow?.map((scr, index) =>
-                                <ExtensionCard
-                                    key={`searched:${index}`}
-                                    name={scr.name ?? `${index}`}
-                                    description={scr.description}
-                                    imageUrl={scr.imageUrl}
-                                    scr={scr}
-                                    onCardClick={installExtension}
-                                    learnMoreUrl={scr.fullName ? `/pkg/${scr.fullName}` : undefined}
-                                    loading={scr.loading}
-                                    label={pxt.isPkgBeta(scr) ? lf("Beta") : undefined}
-                                    role="button"
-                                />)}
-                        </div>
-                        {searchComplete && extensionsToShow.length == 0 &&
-                            <div aria-label="Extension search results">
-                                <p>{lf("We couldn't find any extensions matching '{0}'", searchFor)}</p>
+                <div className="extension-display">
+                    <div className="extension-header">
+                        {(displayMode == ExtensionView.Search || displayMode == ExtensionView.Tags) &&
+                            <div className="breadcrumbs">
+                                <Button
+                                    title={lf("Home")}
+                                    label={lf("Home")}
+                                    onClick={handleHomeButtonClick}
+                                    className="link-button"
+                                />
+                                {displayMode == ExtensionView.Tags &&
+                                    <>
+                                        <span>/</span>
+                                        <span>{selectedTag}</span>
+                                    </>
+                                }
                             </div>
                         }
-                    </div>}
-                {displayMode == ExtensionView.Tags &&
-                    <div className="extension-display">
-                        <div className="breadcrumbs">
-                            <span className="link" onClick={handleHomeButtonClick}>{lf("Home")}</span>
-                            <span>/</span>
-                            <span>{selectedTag}</span>
-                        </div>
-                        <div className="ui cards left">
-                            {extensionsToShow?.map((scr, index) =>
-                                <ExtensionCard
-                                    key={`tagged:${index}`}
-                                    name={scr.name ?? `${index}`}
-                                    description={scr.description}
-                                    imageUrl={scr.imageUrl}
-                                    scr={scr}
-                                    onCardClick={installExtension}
-                                    learnMoreUrl={scr.fullName ? `/pkg/${scr.fullName}` : undefined}
-                                    loading={scr.loading}
-                                    label={pxt.isPkgBeta(scr) ? lf("Beta") : undefined}
-                                    role="button"
-                                />)}
-                        </div>
-                    </div>}
-                {displayMode == ExtensionView.Tabbed &&
-                    <div className="extension-display">
-                        <div className="tab-header">
+                        {displayMode == ExtensionView.Tabbed &&
+                            <div className="tab-header">
+                                {!!extensionsInDevelopment.length &&
+                                    <>
+                                        <Button
+                                            title={lf("Recommended Extensions")}
+                                            label={lf("Recommended")}
+                                            onClick={() => { setCurrentTab(TabState.Recommended) }}
+                                            className={currentTab == TabState.Recommended ? "selected" : ""}
+                                        />
+                                        <Button
+                                            title={lf("Local GitHub Projects")}
+                                            label={lf("Local")}
+                                            onClick={() => { setCurrentTab(TabState.InDevelopment) }}
+                                            className={currentTab == TabState.InDevelopment ? "selected" : ""}
+                                        />
+                                    </>}
+                                {!extensionsInDevelopment.length &&
+                                    <h2>{lf("Recommended")}</h2>
+                                }
+                            </div>
+                        }
+                        <div className="import-button">
                             <Button
-                                key={"Recommended"}
-                                title={lf("Recommended")}
-                                label={lf("Recommended")}
-                                onClick={() => { setCurrentTab(TabState.Recommended) }}
-                                className={currentTab == TabState.Recommended ? "selected" : ""}
+                                ariaLabel={(lf("Open file from your computer"))}
+                                title={(lf("Import File"))}
+                                label={(lf("Import File"))}
+                                leftIcon="fas fa-upload"
+                                className="gray"
+                                onClick={importExtension}
                             />
-                            <Button
-                                key={"In Development"}
-                                title={lf("In Development")}
-                                label={lf("In Development")}
-                                onClick={() => { setCurrentTab(TabState.InDevelopment) }}
-                                className={currentTab == TabState.InDevelopment ? "selected" : ""}
-                            />
-                        </div>
-                        <div className="ui cards left">
-                            {currentTab == TabState.Recommended && preferredExts.map((e, index) =>
-                                <ExtensionCard
-                                    key={`preferred:${index}`}
-                                    scr={e}
-                                    name={e.name ?? `${index}`}
-                                    onCardClick={installExtension}
-                                    imageUrl={e.imageUrl}
-                                    description={e.description}
-                                    learnMoreUrl={e.fullName ? `/pkg/${e.fullName}` : undefined}
-                                    loading={e.loading}
-                                    label={pxt.isPkgBeta(e) ? lf("Beta") : undefined}
-                                    role="button"
-                                />
-                            )
-                            }
-                            {currentTab == TabState.InDevelopment && local.forEach((p, index) =>
-                                <ExtensionCard
-                                    key={`local:${index}`}
-                                    name={p.name}
-                                    description={lf("Local copy of {0} hosted on github.com", p.githubId)}
-                                    url={"https://github.com/" + p.githubId}
-                                    imageUrl={p.icon}
-                                    scr={p}
-                                    onCardClick={addLocal}
-                                    label={lf("Local")}
-                                    title={lf("Local GitHub extension")}
-                                    labelClass="blue right ribbon"
-                                    role="button"
-                                />
-                            )
-                            }
                         </div>
                     </div>
-                }
+                    {displayMode == ExtensionView.Search &&
+                        <>
+                            <div className="extension-cards">
+                                {extensionsToShow?.map((scr, index) =>
+                                    <ExtensionCard
+                                        key={classList("searched", index + "", scr.loading && "loading")}
+                                        title={scr.name ?? `${index}`}
+                                        description={scr.description}
+                                        imageUrl={scr.imageUrl}
+                                        extension={scr}
+                                        onClick={installExtension}
+                                        learnMoreUrl={scr.learnMoreUrl || (scr.fullName ? `/pkg/${scr.fullName}` : undefined)}
+                                        loading={scr.loading}
+                                        label={pxt.isPkgBeta(scr) ? lf("Beta") : undefined}
+                                        showDisclaimer={scr.type != pxtc.service.ExtensionType.Bundled && scr.repo?.status != pxt.github.GitRepoStatus.Approved}
+                                    />)}
+                            </div>
+                            {searchComplete && extensionsToShow.length == 0 &&
+                                <div aria-label="Extension search results">
+                                    <p>{lf("We couldn't find any extensions matching '{0}'", searchFor)}</p>
+                                </div>
+                            }
+                        </>}
+                    {displayMode == ExtensionView.Tags &&
+                        <div className="extension-cards">
+                            {extensionsToShow?.map((scr, index) =>
+                                <ExtensionCard
+                                    key={classList("tagged", index + "", scr.loading && "loading")}
+                                    title={scr.name ?? `${index}`}
+                                    description={scr.description}
+                                    imageUrl={scr.imageUrl}
+                                    extension={scr}
+                                    onClick={installExtension}
+                                    learnMoreUrl={scr.learnMoreUrl || (scr.fullName ? `/pkg/${scr.fullName}` : undefined)}
+                                    loading={scr.loading}
+                                    label={pxt.isPkgBeta(scr) ? lf("Beta") : undefined}
+                                />)}
+                        </div>}
+                    {displayMode == ExtensionView.Tabbed &&
+                        <div className="extension-cards">
+                            {currentTab == TabState.Recommended && preferredExts.map((scr, index) =>
+                                <ExtensionCard
+                                    key={classList("preferred", index + "", scr.loading && "loading")}
+                                    extension={scr}
+                                    title={scr.name ?? `${index}`}
+                                    onClick={installExtension}
+                                    imageUrl={scr.imageUrl}
+                                    description={scr.description}
+                                    learnMoreUrl={scr.learnMoreUrl || (scr.fullName ? `/pkg/${scr.fullName}` : undefined)}
+                                    loading={scr.loading}
+                                    label={pxt.isPkgBeta(scr) ? lf("Beta") : undefined}
+                                />
+                            )}
+                            {currentTab == TabState.InDevelopment && extensionsInDevelopment.map((p, index) =>
+                                <ExtensionCard
+                                    key={`local:${index}`}
+                                    title={p.name}
+                                    description={lf("Local copy of {0} hosted on github.com", p.githubId)}
+                                    imageUrl={p.icon}
+                                    extension={p}
+                                    onClick={addLocal}
+                                />
+                            )}
+                        </div>}
+                </div>
             </div>
         </Modal>
     )
-}
-
-interface ExtensionCardProps extends pxt.CodeCard {
-    scr: pxtc.service.ExtensionMeta;
-    onCardClick: (scr: any) => void;
-    loading?: boolean;
-}
-
-const ExtensionCard = (props: ExtensionCardProps) => {
-    const handleClick = () => {
-        props.onCardClick(props.scr);
-    }
-
-    return <codecard.CodeCardView {...props} onClick={handleClick} key={props.name} />
 }

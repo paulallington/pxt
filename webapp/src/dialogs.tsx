@@ -306,7 +306,7 @@ interface ProgressBarProps {
     cornerRadius?: number;
 }
 
-class ProgressBar extends React.Component<ProgressBarProps, {}> {
+export class ProgressBar extends React.Component<ProgressBarProps, {}> {
     render() {
         let { percentage, label, cornerRadius } = this.props;
 
@@ -546,7 +546,7 @@ export function showImportGithubDialogAsync() {
                 description: r.description,
                 updatedAt: r.updatedAt,
                 onClick: () => {
-                    res = pxt.github.normalizeRepoId("https://github.com/" + r.fullName, "master")
+                    res = pxt.github.normalizeRepoId("https://github.com/" + r.fullName, r.defaultBranch)
                     core.hideDialog()
                 },
             }));

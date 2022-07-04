@@ -16,6 +16,7 @@
     font-weight: 400;
     line-height: 1em;
     font-style: normal;
+    font-size: 16px;
     text-align: center;
     text-decoration: none;
     border-radius: 0.2em;
@@ -222,6 +223,12 @@
     text-decoration: underline;
 }
 
+.common-button.link-button:focus {
+    outline: none;
+    border: none;
+    text-decoration: underline;
+}
+
 /****************************************************
  *                   Circle Buttons                 *
  ****************************************************/
@@ -257,6 +264,11 @@
 }
 
 .common-button.discourse {
+    background: #333333;
+    color: @buttonTextColorDarkBackground;
+}
+
+.common-button.device-share {
     background: #333333;
     color: @buttonTextColorDarkBackground;
 }

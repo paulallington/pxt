@@ -137,6 +137,8 @@ namespace pxtblockly {
             }
 
             Blockly.WidgetDiv.show(widgetOwner, this.sourceBlock_.RTL, () => {
+                if (document.activeElement && document.activeElement.tagName === "INPUT") (document.activeElement as HTMLInputElement).blur();
+
                 fv.hide();
 
                 widgetDiv.classList.remove("sound-effect-editor-widget");
@@ -148,6 +150,7 @@ namespace pxtblockly {
                 widgetDiv.style.height = "";
                 widgetDiv.style.opacity = "";
                 widgetDiv.style.transition = "";
+                widgetDiv.style.alignItems = "";
 
                 Blockly.Events.enable();
                 Blockly.Events.setGroup(true);
@@ -196,7 +199,8 @@ namespace pxtblockly {
             widgetDiv.style.top = top + "px";
             widgetDiv.style.width = "30rem";
             widgetDiv.style.height = "40rem";
-            widgetDiv.style.display = "block";
+            widgetDiv.style.display = "flex";
+            widgetDiv.style.alignItems = "center";
             widgetDiv.style.transition = "transform 0.25s ease 0s, opacity 0.25s ease 0s";
             widgetDiv.style.borderRadius = "";
 

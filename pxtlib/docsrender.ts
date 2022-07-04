@@ -418,13 +418,26 @@ namespace pxt.docs {
 
     export function setupRenderer(renderer: marked.Renderer) {
         renderer.image = function (href: string, title: string, text: string) {
-            let out = '<img class="ui image" src="' + href + '" alt="' + text + '"';
-            if (title) {
-                out += ' title="' + title + '"';
+            const endpointName="makecode-lucas-testing-makecodetempmediaservice-usea";
+            if (href.startsWith("youtube:")) {
+                let out = '<div class="tutorial-video-embed"><iframe src="https://www.youtube.com/embed/' + href.split(":").pop()
+                    + '" title="' + title + '" frameborder="0" ' + 'allowFullScreen ' + 'allow="autoplay; picture-in-picture"></iframe></div>';
+                return out;
+
+            } else if (href.startsWith("azuremedia:")) {
+                let out = `<div class="tutorial-video-embed"><video class="ams-embed" controls src="https://${endpointName}.streaming.media.azure.net/` + href.split(":").pop() + '/manifest(format=mpd-time-cmaf)" /></div>';
+                return out;
+
+            } else {
+                let out = '<img class="ui image" src="' + href + '" alt="' + text + '"';
+                if (title) {
+                    out += ' title="' + title + '"';
+                }
+                out += ' loading="lazy"';
+                out += (this as any).options.xhtml ? '/>' : '>';
+                return out;
             }
-            out += ' loading="lazy"';
-            out += (this as any).options.xhtml ? '/>' : '>';
-            return out;
+
         }
         renderer.listitem = function (text: string): string {
             const m = /^\s*\[( |x)\]/i.exec(text);
