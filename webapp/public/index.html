@@ -88,7 +88,7 @@
             visibility: hidden;
         }
 
-        .overlay{
+        .overlay-loader{
             position: fixed;
             width: 100%;
             height: 100%;
@@ -158,14 +158,14 @@
             visibility: visible;
         }
 
-        .spanner, .overlay{
+        .spanner, .overlay-loader{
             opacity: 0;
             -webkit-transition: all 0.3s;
             -moz-transition: all 0.3s;
             transition: all 0.3s;
         }
 
-        .spanner.show, .overlay.show {
+        .spanner.show, .overlay-loader.show {
             opacity: 1;
         }
     </style>
@@ -178,7 +178,7 @@
         <div class="ui large main loader"></div>
     </div>
 
-    <div class="overlay"></div>
+    <div class="overlay-loader"></div>
     <div class="spanner">
         <div class="loader-project"></div>
     </div>
