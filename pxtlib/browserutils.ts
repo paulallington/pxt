@@ -1299,7 +1299,10 @@ namespace pxt.BrowserUtils {
             const left = ((width / 2) - (popUpWidth / 2)) + winLeft;
             const top = ((height / 2) - (popUpHeight / 2)) + winTop;
 
-            const popupWindow = window.open(url, title, "width=" + popUpWidth + ", height=" + popUpHeight + ", top=" + top + ", left=" + left);
+            const features = "width=" + popUpWidth + ", height=" + popUpHeight + ", top=" + top + ", left=" + left;
+
+            // Current CEF version does not like when features parameter is passed and just immediately rejects.
+            const popupWindow = window.open(url, title, !pxt.BrowserUtils.isIpcRenderer() ? features : undefined);
             if (popupWindow.focus) {
                 popupWindow.focus();
             }
@@ -1307,7 +1310,7 @@ namespace pxt.BrowserUtils {
             return popupWindow;
         } catch (e) {
             // Error opening popup
-            pxt.tickEvent('pxt.popupError', { url: url, msg: e.message });
+            pxt.tickEvent('pxt.popupError', { msg: e.message });
             return null;
         }
     }
