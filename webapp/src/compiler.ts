@@ -181,9 +181,10 @@ export function compileAsync(options: CompileOptions = {}): Promise<pxtc.Compile
 
             // keep the assembly file - it is only generated when user hits "Download"
             // and is usually overwritten by the autorun very quickly, so it's impossible to see it
-            let prevasm = outpkg.files[pxtc.BINARY_ASM]
-            if (prevasm && !resp.outfiles[pxtc.BINARY_ASM]) {
-                resp.outfiles[pxtc.BINARY_ASM] = prevasm.content
+            for (const file of Object.keys(outpkg.files)) {
+                if (file.endsWith(".asm") && !resp.outfiles[file]) {
+                    resp.outfiles[file] = outpkg.files[file].content;
+                }
             }
 
             // add metadata about current build
@@ -496,19 +497,18 @@ export function refreshLanguageServiceApisInfo() {
     refreshApis = true;
 }
 
-export function apiSearchAsync(searchFor: pxtc.service.SearchOptions) {
-    return ensureApisInfoAsync()
-        .then(() => {
-            searchFor.localizedApis = cachedApis;
-            searchFor.localizedStrings = pxt.Util.getLocalizedStrings();
-            return workerOpAsync("apiSearch", {
-                search: searchFor,
-                blocks: blocksOptions()
-            });
-        });
+export async function apiSearchAsync(searchFor: pxtc.service.SearchOptions): Promise<pxtc.service.SearchInfo[]> {
+    await waitForFirstTypecheckAsync();
+    await ensureApisInfoAsync();
+    searchFor.localizedApis = cachedApis;
+    searchFor.localizedStrings = pxt.Util.getLocalizedStrings();
+    return workerOpAsync("apiSearch", {
+        search: searchFor,
+        blocks: blocksOptions()
+    });
 }
 
-export function projectSearchAsync(searchFor: pxtc.service.ProjectSearchOptions) {
+export function projectSearchAsync(searchFor: pxtc.service.ProjectSearchOptions): Promise<pxtc.service.ProjectSearchInfo[]> {
     return ensureApisInfoAsync()
         .then(() => {
             return workerOpAsync("projectSearch", { projectSearch: searchFor });
@@ -541,6 +541,7 @@ export function snippetAsync(qName: string, python?: boolean): Promise<string> {
 
 export function typecheckAsync() {
     const epkg = pkg.mainEditorPkg();
+    const isFirstTypeCheck = !firstTypecheck;
     let p = epkg.buildAssetsAsync()
         .then(() => pkg.mainPkg.getCompileOptionsAsync())
         .then(opts => {
@@ -549,9 +550,14 @@ export function typecheckAsync() {
         })
         .then(() => workerOpAsync("allDiags", {}) as Promise<pxtc.CompileResult>)
         .then(r => setDiagnostics("typecheck", r.diagnostics, r.sourceMap))
-        .then(ensureApisInfoAsync)
+        .then(() => {
+            if (isFirstTypeCheck) {
+                refreshLanguageServiceApisInfo();
+            }
+            return ensureApisInfoAsync();
+        })
         .catch(catchUserErrorAndSetDiags(null))
-    if (!firstTypecheck) firstTypecheck = p;
+    if (isFirstTypeCheck) firstTypecheck = p;
     return p;
 }
 
