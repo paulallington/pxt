@@ -105,7 +105,7 @@ export const Staff = (props: StaffProps) => {
             />
         <image
             className="music-staff-clef"
-            href="/static/music-editor/treble-clef.svg"
+            href="/docs/static/music-editor/treble-clef.svg"
             height={CLEF_HEIGHT}
             y={STAFF_HEADER_HEIGHT}  />
         <g className="music-staff-rows">

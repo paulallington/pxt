@@ -737,7 +737,7 @@ namespace pxt.assets.music {
                     id: 0,
                     name: lf("Duck"),
                     notes: [],
-                    iconURI: "/static/music-editor/duck.png",
+                    iconURI: "/docs/static/music-editor/duck.png",
                     instrument: {
                         waveform: 15,
                         octave: 4,
@@ -769,7 +769,7 @@ namespace pxt.assets.music {
                     id: 1,
                     name: lf("Cat"),
                     notes: [],
-                    iconURI: "/static/music-editor/cat.png",
+                    iconURI: "/docs/static/music-editor/cat.png",
                     instrument: {
                         waveform: 12,
                         octave: 5,
@@ -797,7 +797,7 @@ namespace pxt.assets.music {
                     id: 2,
                     name: lf("Dog"),
                     notes: [],
-                    iconURI: "/static/music-editor/dog.png",
+                    iconURI: "/docs/static/music-editor/dog.png",
                     instrument: {
                         waveform: 1,
                         octave: 4,
@@ -818,7 +818,7 @@ namespace pxt.assets.music {
                     id: 3,
                     name: lf("Fish"),
                     notes: [],
-                    iconURI: "/static/music-editor/fish.png",
+                    iconURI: "/docs/static/music-editor/fish.png",
                     instrument: {
                         waveform: 1,
                         octave: 3,
@@ -843,7 +843,7 @@ namespace pxt.assets.music {
                     id: 4,
                     name: lf("Car"),
                     notes: [],
-                    iconURI: "/static/music-editor/car.png",
+                    iconURI: "/docs/static/music-editor/car.png",
                     instrument: {
                         waveform: 16,
                         octave: 4,
@@ -864,7 +864,7 @@ namespace pxt.assets.music {
                     id: 5,
                     name: lf("Computer"),
                     notes: [],
-                    iconURI: "/static/music-editor/computer.png",
+                    iconURI: "/docs/static/music-editor/computer.png",
                     instrument: {
                         waveform: 15,
                         octave: 1,
@@ -881,7 +881,7 @@ namespace pxt.assets.music {
                     id: 6,
                     name: lf("Burger"),
                     notes: [],
-                    iconURI: "/static/music-editor/burger.png",
+                    iconURI: "/docs/static/music-editor/burger.png",
                     instrument: {
                         waveform: 1,
                         octave: 1,
@@ -898,7 +898,7 @@ namespace pxt.assets.music {
                     id: 7,
                     name: lf("Cherry"),
                     notes: [],
-                    iconURI: "/static/music-editor/cherry.png",
+                    iconURI: "/docs/static/music-editor/cherry.png",
                     instrument: {
                         waveform: 2,
                         octave: 3,
@@ -915,7 +915,7 @@ namespace pxt.assets.music {
                     id: 8,
                     name: lf("Lemon"),
                     notes: [],
-                    iconURI: "/static/music-editor/lemon.png",
+                    iconURI: "/docs/static/music-editor/lemon.png",
                     instrument: {
                         waveform: 15,
                         octave: 2,
@@ -932,7 +932,7 @@ namespace pxt.assets.music {
                     id: 9,
                     name: lf("Explosion"),
                     notes: [],
-                    iconURI: "/static/music-editor/explosion.png",
+                    iconURI: "/docs/static/music-editor/explosion.png",
                     instrument: {
                         waveform: 11,
                         octave: 4,
