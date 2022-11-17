@@ -481,7 +481,8 @@ export class EditorSelector extends data.Component<IEditorSelectorProps, {}> {
     private readonly hideBlockCheck: boolean;
     constructor(props: ISettingsProps) {
         super(props);
-        this.hideBlockCheck = pxt.BrowserUtils.renderBlocksCheck();
+        // this.hideBlockCheck = pxt.BrowserUtils.renderBlocksCheck();
+        this.hideBlockCheck = false // override for now
     }
 
     renderCore() {
