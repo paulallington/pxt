@@ -4,6 +4,8 @@ import { classList, ControlProps } from "../util";
 import { Button } from "./Button";
 
 export interface InputProps extends ControlProps {
+    inputClassName?: string;
+    groupClassName?: string;
     initialValue?: string;
     label?: string;
     title?: string;
@@ -16,7 +18,8 @@ export interface InputProps extends ControlProps {
     autoComplete?: boolean;
     selectOnClick?: boolean;
     treatSpaceAsEnter?: boolean;
-    handleInputRef?: (ref: HTMLInputElement) => void;
+    handleInputRef?: React.RefObject<HTMLInputElement> | ((ref: HTMLInputElement) => void);
+    preserveValueOnBlur?: boolean;
 
     onChange?: (newValue: string) => void;
     onEnterKey?: (value: string) => void;
@@ -28,6 +31,8 @@ export const Input = (props: InputProps) => {
     const {
         id,
         className,
+        inputClassName,
+        groupClassName,
         role,
         ariaHidden,
         ariaLabel,
@@ -46,7 +51,8 @@ export const Input = (props: InputProps) => {
         onEnterKey,
         onIconClick,
         onBlur,
-        handleInputRef
+        handleInputRef,
+        preserveValueOnBlur
     } = props;
 
     const [value, setValue] = React.useState(undefined);
@@ -85,7 +91,9 @@ export const Input = (props: InputProps) => {
         if (onBlur) {
             onBlur(value);
         }
-        setValue(undefined);
+        if (!preserveValueOnBlur) {
+            setValue(undefined);
+        }
     }
 
     return (
@@ -93,10 +101,10 @@ export const Input = (props: InputProps) => {
             {label && <label className="common-input-label" htmlFor={id}>
                 {label}
             </label>}
-            <div className="common-input-group">
+            <div className={classList("common-input-group", groupClassName)}>
                 <input
                     id={id}
-                    className={classList("common-input", icon && "has-icon")}
+                    className={classList("common-input", icon && "has-icon", inputClassName)}
                     title={title}
                     role={role || "textbox"}
                     tabIndex={disabled ? -1 : 0}

@@ -204,7 +204,6 @@ pre {
 
 .invisibleScrollbar::-webkit-scrollbar {
     background: transparent !important;
-    width: @customScrollbarWidth; // TODO: remove this when the sim breakpoint is fixed
 }
 .invisibleScrollbar::-webkit-scrollbar-thumb {
     display: none !important;
@@ -909,7 +908,7 @@ Field editors
     .common-modal > {
         .common-modal-header {
             height: @mainMenuHeight;
-            background-color: @blue;
+            background-color: @mainMenuInvertedBackground;
             z-index: 202;
             display: flex;
             padding-left: 0rem;
@@ -1681,10 +1680,12 @@ p.ui.font.small {
             display: block !important;
         }
     }
-    .collapsedEditorTools .simPanel {
+    .collapsedEditorTools:not(.tabTutorial) .simPanel {
         > div {
             display: none !important;
         }
+    }
+    .collapsedEditorTools .simPanel {
         aside.simtoolbar button:not(.expand-button) {
             display: none !important;
         }
@@ -1860,7 +1861,7 @@ p.ui.font.small {
 
 /* >= Small Monitor (Small Monitor + Large Monitor + Wide Monitor) */
 @media only screen and (min-width: @computerBreakpoint) {
-    .collapsedEditorTools:not(.headless) #editorSidebar {
+    .collapsedEditorTools:not(.headless):not(.tabTutorial) #editorSidebar {
         min-width: 21px;
         width: 21px;
         padding: 0;
@@ -1873,7 +1874,7 @@ p.ui.font.small {
         background: @editorToolsBackground;
     }
 
-    .collapsedEditorTools:not(.headless) #maineditor {
+    .collapsedEditorTools:not(.headless):not(.tabTutorial) #maineditor {
         left: 21px;
     }
 
@@ -2500,4 +2501,16 @@ select.ui.dropdown {
     .header {
         background-color: #F5BC5F;
     }
+}
+
+
+/** Project settings */
+
+.palette-picker-field {
+    display: flex;
+    align-items: center;
+}
+
+.palette-picker-label {
+    margin-right: 0.5rem;
 }

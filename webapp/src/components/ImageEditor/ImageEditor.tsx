@@ -1,6 +1,7 @@
 import * as React from 'react';
 
-import { Provider, Store } from 'react-redux';
+import { Store } from 'redux';
+import { Provider } from 'react-redux';
 import { mainStore, tileEditorStore } from './store/imageStore'
 import { SideBar } from './SideBar';
 import { BottomBar } from './BottomBar';
@@ -16,6 +17,7 @@ import { EditorState, AnimationState, TilemapState, GalleryTile, ImageEditorStor
 import { imageStateToBitmap, imageStateToTilemap, applyBitmapData } from './util';
 import { Unsubscribe, Action } from 'redux';
 import { createNewImageAsset, getNewInternalID } from '../../assets';
+import { AssetEditorCore } from '../ImageFieldEditor';
 
 export const LIGHT_MODE_TRANSPARENT = "#dedede";
 
@@ -42,7 +44,7 @@ export interface ImageEditorState {
     alert?: AlertInfo;
 }
 
-export class ImageEditor extends React.Component<ImageEditorProps, ImageEditorState> {
+export class ImageEditor extends React.Component<ImageEditorProps, ImageEditorState> implements AssetEditorCore {
     protected unsubscribeChangeListener: Unsubscribe;
 
     constructor(props: ImageEditorProps) {
@@ -281,6 +283,23 @@ export class ImageEditor extends React.Component<ImageEditorProps, ImageEditorSt
     closeNestedEditor() {
         if (this.state.editingTile) {
             (this.refs["nested-image-editor"] as ImageEditor)?.onDoneClick();
+        }
+    }
+
+    getJres() {
+        if (this.props.singleFrame) {
+            const bitmapData = this.getCurrentFrame().data();
+            return pxt.sprite.base64EncodeBitmap(bitmapData);
+        }
+        return "";
+    }
+
+    loadJres(value: string): void {
+        if (value) {
+            try {
+                this.setCurrentFrame(pxt.sprite.getBitmapFromJResURL(value), true);
+            } catch (e) {
+            }
         }
     }
 

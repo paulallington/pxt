@@ -72,6 +72,8 @@ namespace pxsim {
         single?: boolean;
         hideSimButtons?: boolean;
         autofocus?: boolean;
+        queryParameters?: string;
+        mpRole?: "server" | "client";
     }
 
     export interface HwDebugger {
@@ -290,7 +292,7 @@ namespace pxsim {
         }
 
         private getSimUrl(): URL {
-            const simUrl = this.options.simUrl || ((window as any).pxtConfig || {}).simUrl || `${location.origin}/sim/simulator.html`;
+            const simUrl = this.options.simUrl || (window as any).pxtConfig?.simUrl || (pxt as any).webConfig?.simUrl || `${location.origin}/sim/simulator.html`;
             try {
                 return new URL(simUrl);
             } catch {
@@ -320,8 +322,8 @@ namespace pxsim {
                 if (parentWindow) {
                     // if message comes from parent already, don't echo
                     if (source !== parentWindow) {
-                        const parentOrigin = this.options.parentOrigin || window.location.origin
-                        parentWindow.postMessage(msg, parentOrigin);
+                        // posting sim messages to parent frame; no origin restriction.
+                        parentWindow.postMessage(msg, "*");
                     }
                 }
                 if (!this.options.nestedEditorSim && !broadcastmsg?.toParentIFrameOnly) {
@@ -397,18 +399,27 @@ namespace pxsim {
         }
 
         private postMessageCore(frame: HTMLIFrameElement, msg: SimulatorMessage) {
-            frame.contentWindow.postMessage(msg, frame.dataset['origin']);
+            const origin = U.isLocalHostDev() ? "*" : frame.dataset["origin"];
+            frame.contentWindow.postMessage(msg, origin);
+        }
 
-            if (U.isLocalHostDev() && (pxt as any)?.appTarget?.id) {
-                // If using the production simulator on local serve, the domain might have been
-                // redirected by the CLI server. Also send to the production domain just in case
-                try {
-                    frame.contentWindow.postMessage(msg, `https://trg-${(pxt as any)?.appTarget?.id}.userpxt.io/---simulator`);
-                }
-                catch (e) {
-                    // Ignore exceptions if the target origin doesn't match
+        private setRunOptionQueryParams(url: string) {
+            const urlObject = new URL(url);
+            if (this._runOptions?.hideSimButtons) {
+                urlObject.searchParams.set("hideSimButtons", "1");
+            }
+
+            if (this._runOptions?.queryParameters) {
+                const parameters = this._runOptions.queryParameters.split("&");
+                for (const param of parameters) {
+                    const [a, b] = param.split(/[:=]/);
+                    if (a && b) {
+                        urlObject.searchParams.set(a, b);
+                    }
                 }
             }
+
+            return urlObject.toString();
         }
 
         private createFrame(url?: string): HTMLDivElement {
@@ -423,12 +434,7 @@ namespace pxsim {
             frame.setAttribute('sandbox', 'allow-same-origin allow-scripts');
             frame.className = 'no-select';
 
-            let furl = url || this.getSimUrl().toString();
-            if (this._runOptions?.hideSimButtons) {
-                const urlObject = new URL(furl);
-                urlObject.searchParams.append("hideSimButtons", "1");
-                furl = urlObject.toString();
-            }
+            let furl = this.setRunOptionQueryParams(url || this.getSimUrl().toString());
             furl += '#' + frame.id;
 
             frame.src = furl;
@@ -468,7 +474,11 @@ namespace pxsim {
             return wrapper;
         }
 
-        public preload(aspectRatio: number) {
+        public preload(aspectRatio: number, clearRuntime?: boolean) {
+            if (clearRuntime) {
+                this._currentRuntime = undefined;
+                this.container.textContent = "";
+            }
             if (!this.simFrames().length) {
                 this.container.appendChild(this.createFrame());
                 this.applyAspectRatio(aspectRatio);
@@ -627,8 +637,12 @@ namespace pxsim {
             });
         }
 
-        public run(js: string, opts: SimulatorRunOptions = {}) {
+        public setRunOptions(opts: SimulatorRunOptions = {}) {
             this._runOptions = opts;
+        }
+
+        public run(js: string, opts: SimulatorRunOptions = {}) {
+            this.setRunOptions(opts);
             this.runId = this.nextId();
             // store information
             this._currentRuntime = {
@@ -697,9 +711,10 @@ namespace pxsim {
             if (!this._currentRuntime || !frame.contentWindow) return false;
             const msg = JSON.parse(JSON.stringify(this._currentRuntime)) as pxsim.SimulatorRunMessage;
             msg.frameCounter = ++this.frameCounter;
+            const mpRole = this._runOptions?.mpRole || /[\&\?]mp=(server|client)/i.exec(window.location.href)?.[1]?.toLowerCase();
             msg.options = {
                 theme: this.themes[this.nextFrameId++ % this.themes.length],
-                mpRole: /[\&\?]mp=(server|client)/i.exec(window.location.href)?.[1]?.toLowerCase()
+                mpRole
             };
 
             msg.id = `${msg.options.theme}-${this.nextId()}`;

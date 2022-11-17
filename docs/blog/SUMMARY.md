@@ -1,6 +1,9 @@
 # Microsoft MakeCode Blog
 
 * [Blog](/blog)
+    * [Computer Science Education Week 2022](/blog/csed-week/csed-week-2022)
+    * [MakeCode Arcade Fall Release](/blog/arcade/fall-release-2022)
+    * [MakeCode Translation Tips and Tricks](/blog/localization/tips-and-tricks)
     * [MakeCode Minecraft 2022 Update](/blog/minecraft/2022-release)
     * [MakeCode for the micro:bit - 2022 Release](/blog/microbit/2022-release)
     * [AP CSP with MakeCode Professional Development](/blog/csp/csp-prodev-2022)

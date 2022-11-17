@@ -232,6 +232,8 @@ namespace pxsim {
         // destination. Used for muting
         let destination: GainNode;
 
+        export let soundEventCallback: (ev: "playinstructions" | "muteallchannels", data?: Uint8Array) => void;
+
         function context(): AudioContext {
             if (!_context) {
                 _context = freshContext();
@@ -496,6 +498,7 @@ namespace pxsim {
 
         let instrStopId = 1
         export function muteAllChannels() {
+            soundEventCallback?.("muteallchannels");
             instrStopId++
             while (channels.length)
                 channels[0].remove()
@@ -589,7 +592,7 @@ namespace pxsim {
                 channel.gain.gain.setValueAtTime(volume, context().currentTime);
                 channel.gain.connect(destination);
 
-                if (channels.length > 5)
+                if (channels.length > 20)
                     channels[0].remove()
                 channels.push(channel);
 
@@ -661,11 +664,12 @@ namespace pxsim {
 
         export function playInstructionsAsync(instructions: Uint8Array, isCancelled?: () => boolean, onPull?: (freq: number, volume: number) => void) {
             return new Promise<void>(async resolve => {
+                soundEventCallback?.("playinstructions", instructions);
                 let resolved = false;
                 let ctx = context();
                 let channel = new Channel()
 
-                if (channels.length > 5)
+                if (channels.length > 20)
                     channels[0].remove()
                 channels.push(channel);
 
@@ -707,6 +711,11 @@ namespace pxsim {
                     const endVolume = readUint16(instructions, i + 8);
                     const endFrequency = readUint16(instructions, i + 10);
                     totalDuration += duration
+
+                    if (wave === 0) {
+                        currentTime += duration;
+                        continue;
+                    }
 
                     const isSquareWave = 11 <= wave && wave <= 15;
 
@@ -760,7 +769,7 @@ namespace pxsim {
                         }
 
                         const { frequency, volume } = findFrequencyAndVolumeAtTime((time - startTime) * 1000, instructions);
-                        onPull(frequency, volume / 1024);
+                        if (onPull) onPull(frequency, volume / 1024);
 
                         requestAnimationFrame(handleAnimationFrame)
                     }

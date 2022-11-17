@@ -838,6 +838,14 @@
         background-color: @HCbackground;
         color: @HCtextColor;
 
+        .hint-title {
+            margin: 0;
+            > span {
+                background-color: @HCbackground;
+                color: @HCtextColor;
+            }
+        }
+
         &:before {
             border-right-color: @HCtextColor;
         }
@@ -849,6 +857,9 @@
     .tutorial-scroll-gradient { display: none; }
     .tutorial-title { color: @HCtextColor; }
 
+    .tutorial-step-counter {
+        border-color: @HCtextColor;
+    }
     .tutorial-step-bar {
         background-color: @HCbackground;
         border: 1px solid @HCtextColor;
@@ -869,6 +880,12 @@
         .tab-badge {
             display: none;
         }
+    }
+
+    &.tabTutorial details {
+        background-color: @HCbackground !important;
+        border: 2px solid @HCtextColor !important;
+        color: @HCtextColor !important;
     }
 
     .ui.label {

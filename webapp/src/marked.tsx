@@ -6,6 +6,7 @@ import * as marked from "marked";
 import * as compiler from "./compiler"
 import { MediaPlayer } from "dashjs"
 import dashjs = require("dashjs");
+import { fireClickOnEnter } from "../../react-common/components/util";
 
 type ISettingsProps = pxt.editor.ISettingsProps;
 
@@ -306,23 +307,50 @@ export class MarkedContent extends data.Component<MarkedContentProps, MarkedCont
             .forEach((inlineVideo: HTMLElement) => {
 
                 let player = MediaPlayer().create()
-                player.initialize(inlineVideo, inlineVideo.getAttribute("src"));
+                player.initialize(inlineVideo, inlineVideo.getAttribute("src"), /** autoPlay **/ false);
                 const src = inlineVideo.getAttribute('src');
                 let url = new URL(src);
                 pxt.tickEvent("video.loaded", {
                     player: "azure",
                     url: src
                 })
-                const END_TIME = url.searchParams.get("endTime");
-                player.on(
-                    dashjs.MediaPlayer.events.PLAYBACK_TIME_UPDATED,
-                    (e: dashjs.PlaybackTimeUpdatedEvent) => {
-                        if (parseInt(END_TIME) <= e.time) {
-                            player.pause();
-                        }
 
-                    }
-                )
+                const videoElement = player.getVideoElement();
+                const startTime = parseInt(url.searchParams.get("startTime")) || 0;
+                const endTime = parseInt(url.searchParams.get("endTime"));
+                if (endTime) {
+                    player.on(
+                        dashjs.MediaPlayer.events.PLAYBACK_TIME_UPDATED,
+                        (e: dashjs.PlaybackTimeUpdatedEvent) => {
+                            if (endTime <= e.time) {
+                                videoElement.currentTime = startTime;
+                                player.pause();
+                            }
+
+                        }
+                    )
+                }
+
+                if (videoElement?.requestPictureInPicture) {
+                    videoElement.addEventListener("enterpictureinpicture", () => {
+                        videoElement.setAttribute("data-pip-active", "true");
+                    })
+                    videoElement.addEventListener("leavepictureinpicture", () => {
+                        videoElement.setAttribute("data-pip-active", undefined);
+                        player.pause()
+                    });
+                    const pipButton = document.createElement("button");
+                    inlineVideo.parentElement.appendChild(pipButton);
+                    pipButton.addEventListener("click", () => {
+                        pxt.tickEvent("video.pip.requested");
+                        videoElement.requestPictureInPicture();
+                    });
+                    pipButton.addEventListener("keydown", e => fireClickOnEnter(e as any));
+                    pipButton.className = "common-button";
+                    pipButton.textContent = lf("Pop out video");
+                    pipButton.ariaLabel = lf("Open video in picture-in-picture mode");
+                    pipButton.title = pipButton.ariaLabel;
+                }
 
                 player.on(dashjs.MediaPlayer.events.PLAYBACK_STARTED,
                     (e: dashjs.PlaybackStartedEvent) => {
@@ -338,25 +366,88 @@ export class MarkedContent extends data.Component<MarkedContentProps, MarkedCont
 
     // Renders inline blocks, such as "||controller: Controller||".
     private renderInlineBlocks(content: HTMLElement) {
-        pxt.Util.toArray(content.querySelectorAll(`:not(pre) > code`))
-            .forEach((inlineBlock: HTMLElement) => {
+        const inlineBlocks = pxt.Util.toArray(content.querySelectorAll(`:not(pre) > code`))
+            .map((inlineBlock: HTMLElement) => {
                 const text = inlineBlock.innerText;
                 const mbtn = /^(\|+)([^\|]+)\|+$/.exec(text);
                 if (mbtn) {
-                    const mtxt = /^(([^\:\.]*?)[\:\.])?(.*)$/.exec(mbtn[2]);
-                    const ns = mtxt[2] ? mtxt[2].trim().toLowerCase() : '';
+                    const mtxt = /^(([^\:]*?)[\:])?(.*)$/.exec(mbtn[2]);
                     const txt = mtxt[3].trim();
-                    const lev = mbtn[1].length == 1 ?
+                    const isInlineButton = mbtn[1].length == 1;
+                    const ns = mtxt[2] ? mtxt[2].trim().toLowerCase() : '';
+                    const nsSplit = /^([^()]+)\(([^()]+)\)$/.exec(ns);
+                    const displayNs = pxt.Util.htmlEscape(nsSplit?.[1] || ns);
+                    const behaviorNs = pxt.Util.htmlEscape(nsSplit?.[2] || ns);
+                    const lev = isInlineButton ?
                         `docs inlinebutton ui button ${pxt.Util.htmlEscape(txt.toLowerCase())}-button`
-                        : `docs inlineblock ${pxt.Util.htmlEscape(ns)}`;
+                        : `docs inlineblock ${displayNs}`;
 
                     const inlineBlockDiv = document.createElement('span');
                     pxsim.U.clear(inlineBlock);
                     inlineBlock.appendChild(inlineBlockDiv);
                     inlineBlockDiv.className = lev;
                     inlineBlockDiv.textContent = pxt.U.rlf(txt);
+                    inlineBlockDiv.setAttribute("data-ns", behaviorNs);
+                    if (displayNs !== behaviorNs) {
+                        inlineBlockDiv.setAttribute("data-norecolor", "true")
+                    }
+                    return !isInlineButton && inlineBlockDiv;
                 }
-            })
+                return undefined;
+            }).filter(el => !!el);
+        compiler.getBlocksAsync()
+            .then(blocksInfo => {
+                const namespaceNames = Object.keys(blocksInfo.apis.byQName)
+                    .filter(qname => blocksInfo.apis.byQName[qname]?.kind === pxtc.SymbolKind.Module);
+                for (const inlineBlock of inlineBlocks) {
+                    let ns = inlineBlock.getAttribute("data-ns");
+                    // fix capitalization issues, e.g. ``||math: instead of ``||Math:
+                    const exactNamespaceName = namespaceNames.find(el => ns.toLowerCase() == el.toLowerCase());
+                    if (exactNamespaceName && (ns !== exactNamespaceName)) {
+                        ns = exactNamespaceName;
+                    }
+                    const bi = blocksInfo.apis.byQName[ns];
+                    let color = bi?.attributes?.color;
+                    if (/^logic$/i.test(ns)) {
+                        ns = "logic";
+                        color = pxt.toolbox.getNamespaceColor(ns);
+                    } else if (/^functions?$/i.test(ns)) {
+                        ns = "functions";
+                        color = pxt.toolbox.getNamespaceColor(ns);
+                    } else if (/^variables?$/i.test(ns)) {
+                        ns = "variables";
+                        color = pxt.toolbox.getNamespaceColor(ns);
+                    } else if (bi?.kind !== pxtc.SymbolKind.Module){
+                        continue;
+                    }
+
+                    const isAdvanced = bi?.attributes?.advanced;
+                    inlineBlock.classList.add("clickable");
+                    inlineBlock.tabIndex = 0;
+                    inlineBlock.ariaLabel = lf("Toggle the {0} category", ns);
+                    inlineBlock.title = inlineBlock.ariaLabel;
+                    if (color && !inlineBlock.getAttribute("data-norecolor")) {
+                        inlineBlock.style.backgroundColor = color;
+                        inlineBlock.style.borderColor = pxt.toolbox.fadeColor(color, 0.1, false);
+                    }
+                    inlineBlock.addEventListener("click", e => {
+                        // need to filter out editors that are currently hidden as we leave toolboxes in dom
+                        const editorSelector = `#maineditor > div:not([style*="display:none"]):not([style*="display: none"])`;
+
+                        if (isAdvanced) {
+                            // toggle advanced open first if it is collapsed.
+                            const advancedSelector = `${editorSelector} .blocklyTreeRow[data-ns="advancedcollapsed"]`;
+                            const advancedRow = document.querySelector<HTMLDivElement>(advancedSelector);
+                            advancedRow?.click();
+                        }
+
+                        const toolboxSelector = `${editorSelector} .blocklyTreeRow[data-ns="${ns}"]`;
+                        const toolboxRow = document.querySelector<HTMLDivElement>(toolboxSelector);
+                        toolboxRow?.click();
+                    });
+                    inlineBlock.addEventListener("keydown", e => fireClickOnEnter(e as any))
+                }
+            });
     }
 
     // Renders icon bullets, such as ":mouse pointer:" and ":paint brush:".
@@ -487,6 +578,16 @@ export class MarkedContent extends data.Component<MarkedContentProps, MarkedCont
         accordionHints.forEach((hint) => {
             // Create a 'details' element to replace the hint-begin element.
             const detailsElement = document.createElement('details');
+
+            detailsElement.addEventListener("pointerdown", () => {
+                const videoElements = detailsElement.querySelectorAll("video");
+                for (const el of videoElements) {
+                    if (!el.getAttribute("data-pip-active")) {
+                        el.pause();
+                    }
+                }
+            })
+            detailsElement.addEventListener("keydown", fireClickOnEnter as any);
             // Append the summary element to the details element...
             detailsElement.append(hint.summary);
             // ...and any child nodes we detected along the way.

@@ -22,6 +22,7 @@ declare namespace pxt {
         packages?: PackagesConfig;
         shareLinks?: ShareConfig;
         skillMap?: SkillMapConfig;
+        multiplayer?: MultiplayerConfig;
         // common galleries
         galleries?: pxt.Map<string | GalleryProps>;
         // localized galleries
@@ -39,19 +40,17 @@ declare namespace pxt {
         bannedRepos?: string[];
         allowUnapproved?: boolean;
         approvedRepoLib?: pxt.Map<RepoData>;
-        // format:
-        // "acme-corp/pxt-widget": "min:v0.1.2" - auto-upgrade to that version
-        // "acme-corp/pxt-widget": "dv:foo,bar" - add "disablesVariant": ["foo", "bar"] to pxt.json
-        upgrades?: pxt.Map<string>;
         // list of trusted custom editor extension urls
         // that can bypass consent and send/receive messages
         approvedEditorExtensionUrls?: string[];
-        extensionsToolboxDisallowDelete?: string[]; // List of extensions to ignore when allowing for deletion in toolbox
     }
 
     interface RepoData {
         preferred?: boolean;
         tags?: string[];
+        // format:
+        // "acme-corp/pxt-widget": "min:v0.1.2" - auto-upgrade to that version
+        // "acme-corp/pxt-widget": "dv:foo,bar" - add "disablesVariant": ["foo", "bar"] to pxt.json
         upgrades?: string[];
     }
 
@@ -62,6 +61,17 @@ declare namespace pxt {
     interface SkillMapConfig {
         defaultPath?: string;
         pathAliases?: pxt.Map<string>; // map in the format "alias": "path"
+    }
+
+    interface MultiplayerConfig {
+        games?: MultiplayerGameCard[];
+    }
+
+    interface MultiplayerGameCard {
+        shareId: string;
+        title: string;
+        subtitle: string;
+        image?: string;
     }
 
     interface AppTarget {
@@ -459,6 +469,8 @@ declare namespace pxt {
         downloadDialogTheme?: DownloadDialogTheme;
         winAppDeprImage?: string; // Image to show on Windows App for deprecation
         showWinAppDeprBanner?: boolean; // show banner announcing Windows App deprecation
+        multiplayerShareButton?: boolean; // display multiplayer button alongside social links
+        songEditor?: boolean; // enable the song asset type and field editor
         javaScript?: boolean; // allow javascript blocks
         showDelete?: boolean; // show delete option in menu
         showReset?: boolean; // show reset option in menu
@@ -994,6 +1006,7 @@ declare namespace ts.pxtc {
         trace?: boolean;
         justMyCode?: boolean;
         computeUsedSymbols?: boolean;
+        computeUsedParts?: boolean;
         name?: string;
         apisInfo?: ApisInfo;
         bannedCategories?: string[];
@@ -1001,6 +1014,7 @@ declare namespace ts.pxtc {
         skipPxtModulesEmit?: boolean; // skip re-emit of pxt_modules/*
         clearIncrBuildAndRetryOnError?: boolean; // on error when compiling in service, try again with a full recompile.
         errorOnGreyBlocks?: boolean;
+        generateSourceMap?: boolean;
 
         otherMultiVariants?: ExtensionTarget[];
 
@@ -1026,6 +1040,7 @@ declare namespace ts.pxtc {
         fnArgs?: pxt.Map<String[]>;
         parts?: string[];
         usedBuiltinParts?: string[];
+        breakpoints?: number[];
     }
 
     interface UpgradePolicy {
@@ -1094,6 +1109,7 @@ declare namespace pxt.tutorial {
         jres?: string; // JRES to be used when generating hints; necessary for tilemaps
         customTs?: string; // custom typescript code loaded in a separate file for the tutorial
         tutorialValidationRules?: pxt.Map<boolean>; //a map of rules used in a tutorial and if the rules are activated
+        globalBlockConfig?: TutorialBlockConfig; // concatenated `blockconfig.global` sections. Contains block configs applicable to all tutorial steps
     }
 
     interface TutorialMetadata {
@@ -1119,6 +1135,16 @@ declare namespace pxt.tutorial {
         blockIds?: string[];
     }
 
+    interface TutorialBlockConfigEntry {
+        blockId?: string;
+        xml?: string;
+    }
+
+    interface TutorialBlockConfig {
+        md?: string;    // `blockconfig` markdown fragment
+        blocks?: TutorialBlockConfigEntry[]; // markdown fragment can contain multiple block definitions
+    }
+
     interface TutorialStepInfo {
         // Step metadata
         showHint?: boolean; // automatically displays hint
@@ -1140,6 +1166,9 @@ declare namespace pxt.tutorial {
         hintContentMd?: string;
         // fullscreen?: boolean; // DEPRECATED, replaced by "showHint"
         // unplugged?: boolean: // DEPRECATED, replaced by "showDialog"
+
+        // concatenated `blockconfig.local` sections. Contains block configs applicable to the current step only
+        localBlockConfig?: pxt.tutorial.TutorialBlockConfig;
     }
 
     interface TutorialActivityInfo {
@@ -1171,6 +1200,7 @@ declare namespace pxt.tutorial {
         customTs?: string; // custom typescript code loaded in a separate file for the tutorial
         tutorialValidationRules?: pxt.Map<boolean>; //a map of rules used in a tutorial and if the rules are activated
         templateLoaded?: boolean; // if the template code has been loaded once, we skip
+        globalBlockConfig?: TutorialBlockConfig; // concatenated `blockconfig.global` sections. Contains block configs applicable to all tutorial steps
     }
     interface TutorialCompletionInfo {
         // id of the tutorial

@@ -6,19 +6,18 @@ import '../styles/modal.css'
 
 import * as React from "react";
 import { connect } from 'react-redux';
-import { ModalState, ModalType, ShareState, SkillMapState } from '../store/reducer';
+import { ModalType, ShareState, SkillMapState } from '../store/reducer';
 import { dispatchHideModal, dispatchNextModal, dispatchShowShareModal, dispatchRestartActivity, dispatchOpenActivity, dispatchResetUser, dispatchShowCarryoverModal, dispatchSetShareStatus, dispatchCloseUserProfile, dispatchShowUserProfile, dispatchShowLoginModal } from '../actions/dispatch';
-import { tickEvent, postAbuseReportAsync, resolvePath, postShareAsync } from "../lib/browserUtils";
-import { lookupActivityProgress, lookupPreviousActivityStates, lookupPreviousCompletedActivityState, isCodeCarryoverEnabled, getCompletionBadge, isRewardNode } from "../lib/skillMapUtils";
-import { getProjectAsync } from "../lib/workspaceProvider";
+import { tickEvent, postAbuseReportAsync} from "../lib/browserUtils";
+import { lookupActivityProgress, lookupPreviousCompletedActivityState, isCodeCarryoverEnabled, getCompletionBadge, isRewardNode } from "../lib/skillMapUtils";
 import { editorUrl } from "./makecodeFrame";
 
-import { Modal, ModalAction } from 'react-common/controls/Modal';
-import { jsxLF } from "react-common/util";
-import { Badge } from "react-common/profile/Badge";
-import { Button } from "react-common/controls/Button";
-import { Checkbox } from "react-common/controls/Checkbox";
-import { Input } from "react-common/controls/Input";
+import { Modal, ModalAction } from 'react-common/components/controls/Modal';
+import { jsxLF } from "react-common/components/util";
+import { Badge } from "react-common/components/profile/Badge";
+import { Button } from "react-common/components/controls/Button";
+import { SignInModal } from "react-common/components/profile/SignInModal";
+import { Share, ShareData } from "react-common/components/share/Share";
 
 interface AppModalProps {
     type: ModalType;
@@ -42,25 +41,31 @@ interface AppModalProps {
     dispatchShowUserProfile: () => void;
     dispatchCloseUserProfile: () => void;
     dispatchResetUser: () => void;
-    dispatchSetShareStatus: (headerId?: string, url?: string) => void;
+    dispatchSetShareStatus: (headerId?: string, projectName?: string, data?: ShareData) => void;
     dispatchShowShareModal: (mapId: string, activityId: string, teamsShare?: boolean) => void;
     dispatchShowLoginModal: () => void;
 }
 
 interface AppModalState {
     loading?: boolean;
-    data?: ShareModalData;
     checkboxSelected?: boolean; // For the Login modal and delete confirmation
-}
-
-interface ShareModalData {
-    shortId: string;
+    resolvePublish?: (data: ShareData) => void;
 }
 
 export class AppModalImpl extends React.Component<AppModalProps, AppModalState> {
     constructor (props: AppModalProps) {
         super(props);
         this.state = {};
+    }
+
+    componentDidUpdate(prevProps: Readonly<AppModalProps>, prevState: Readonly<AppModalState>, snapshot?: any): void {
+        if (this.state.resolvePublish && this.props.shareState?.data) {
+            const resolve = this.state.resolvePublish;
+            this.setState({
+                resolvePublish: undefined
+            });
+            resolve(this.props.shareState.data);
+        }
     }
 
     render() {
@@ -94,7 +99,7 @@ export class AppModalImpl extends React.Component<AppModalProps, AppModalState> 
     }
 
     protected handleOnClose = () => {
-        this.setState({ loading: false, data: undefined, checkboxSelected: false });
+        this.setState({ loading: false, resolvePublish: undefined, checkboxSelected: false });
         this.props.dispatchHideModal();
         this.props.dispatchSetShareStatus();
     }
@@ -104,6 +109,20 @@ export class AppModalImpl extends React.Component<AppModalProps, AppModalState> 
         const previousState = lookupPreviousCompletedActivityState(userState!, pageSourceUrl!, skillMap!, activity!.activityId);
         if (previousState)
             this.props.dispatchShowShareModal(mapId, previousState.activityId, true);
+    }
+
+    protected handleMultiplayerShareClick = async () => {
+        const { mapId, userState, pageSourceUrl, skillMap, activity } = this.props;
+        const previousState = lookupPreviousCompletedActivityState(userState!, pageSourceUrl!, skillMap!, activity!.activityId);
+        const prevActivity = skillMap?.activities[previousState.activityId];
+
+        const shareInfo = await this.publishAsync(prevActivity?.displayName!, userState!, pageSourceUrl!, mapId, prevActivity!);
+
+        const domain = pxt.BrowserUtils.isLocalHostDev() ? "http://localhost:3000/--" : pxt.webConfig.relprefix;
+
+        const shareId = shareInfo.url.split("/").slice(-1)[0];
+        const multiplayerHostUrl = `${domain}multiplayer?host=${shareId}`;
+        window.open(multiplayerHostUrl, "_blank");
     }
 
     protected getCompletionActionText(action: MapCompletionAction) {
@@ -200,6 +219,9 @@ export class AppModalImpl extends React.Component<AppModalProps, AppModalState> 
 
         const onButtonClick = reward ? onCertificateClick : dispatchNextModal
 
+        const shouldShowShare = previousState && previousState.headerId;
+        const showMultiplayerShare = shouldShowShare && (activity as MapCompletionNode).showMultiplayerShare;
+
         return <div className="confetti-container">
             <Modal title={completionModalTitle} actions={this.getCompletionActions(node.actions)} className="completion" onClose={this.handleOnClose}>
                 {completionModalTextSegments[0]}{<strong>{skillMap.displayName}</strong>}{completionModalTextSegments[1]}
@@ -209,13 +231,21 @@ export class AppModalImpl extends React.Component<AppModalProps, AppModalState> 
                     label={lf("Claim your reward!")}
                     leftIcon="fas fa-gift"
                     onClick={onButtonClick} />
-                {(previousState && previousState.headerId) &&
+                {shouldShowShare && !showMultiplayerShare &&
                     <Button
                         className="primary completion-reward"
                         title={lf("Share your game!")}
                         label={lf("Share your game!")}
                         leftIcon="fas fa-share"
                         onClick={this.handleRewardShareClick} />
+                }
+                {showMultiplayerShare &&
+                    <Button
+                        className="primary completion-reward"
+                        title={lf("Play online with friends!")}
+                        label={lf("Play online with friends!")}
+                        leftIcon="fas fa-share"
+                        onClick={this.handleMultiplayerShareClick} />
                 }
             </Modal>
             {this.renderConfetti()}
@@ -324,108 +354,50 @@ export class AppModalImpl extends React.Component<AppModalProps, AppModalState> 
         }
     }
 
+    protected publishAsync = async (name: string, userState: UserState, pageSourceUrl: string, mapId: string, activity: MapNode) => {
+        const { dispatchSetShareStatus } = this.props;
+        tickEvent("skillmap.share", { path: mapId, activity: activity.activityId });
+        const progress = lookupActivityProgress(userState, pageSourceUrl, mapId!, activity.activityId);
+
+        dispatchSetShareStatus(progress?.headerId, name);
+
+        return new Promise<ShareData>(resolve => {
+            this.setState({
+                resolvePublish: resolve
+            })
+        });
+    };
+
     renderShareModal() {
-        const { userState, pageSourceUrl, mapId, activity, shareState, dispatchSetShareStatus } = this.props;
-        const { loading } = this.state;
+        const { activity, userState, pageSourceUrl, mapId } = this.props;
 
-        const shortId = shareState?.url;
+        const publishAsync = (name: string) =>
+            this.publishAsync(name, userState!, pageSourceUrl!, mapId, activity!)
 
-        const resetModalTitle = shortId ? lf("Share Project") : lf("Publish Project");
 
-        const actions = [];
-        if (!shortId) {
-            actions.push({ label: lf("Cancel"), onClick: this.handleOnClose });
-            actions.push({ label: lf("Publish"), onClick: async () => {
-                tickEvent("skillmap.share", { path: mapId, activity: activity!.activityId });
-                this.setState({ loading: true });
-
-                const progress = lookupActivityProgress(userState!, pageSourceUrl!, mapId!, activity!.activityId);
-
-                dispatchSetShareStatus(progress?.headerId);
-            }});
-        }
-
-        return <Modal title={resetModalTitle} actions={actions} onClose={this.handleOnClose}>
-            {shortId ?
-                <div>{ lf("Your project is ready! Use the address below to share your projects.") }</div> :
-                <div className="share-disclaimer">
-                    { lf("You need to publish your project to share it or embed it in other web pages. You acknowledge having consent to publish this project.") }
-                </div>
-            }
-            {(loading && !shortId) && <div className="share-loader">
-                <div className="common-spinner" />
-                <span>{lf("Loading...")}</span>
-            </div>}
-            {shortId && <Input
-                    type="text"
-                    className="share-input"
-                    ariaLabel="Generated shareable URL for project"
-                    initialValue={`https://makecode.com/${shortId}`}
-                    icon="fas fa-copy"
-                    iconTitle="Copy project URL"
-                    readOnly={true}
-                    autoComplete={false}
-                    selectOnClick={true}
-                    onIconClick={this.handleShareCopyClick} />}
-            {(shortId && shareState?.rewardsShare) && <div>
-                {this.renderConfetti()}
-            </div>}
+        return <Modal
+            title={lf("Share Project")}
+            className="sharedialog"
+            parentElement={document.getElementById("root") || undefined}
+            onClose={this.handleOnClose}>
+            <Share projectName={activity!.displayName}
+                isLoggedIn={false}
+                publishAsync={publishAsync}
+                simRecorder={undefined as any} />
         </Modal>
     }
 
     renderLoginModal(activityPrompt: boolean) {
-        const rememberMeSelected = this.state.checkboxSelected ?? false;
 
-        const signInIconAltText = lf("Sign in icon")
-
-        const msft = pxt.auth.identityProvider("microsoft");
-        const buttons = [];
-        buttons.push({
-            label: lf("Sign In"),
-            onClick: async () => {
-                pxt.tickEvent(`skillmap.signindialog.signin`, { provider: msft.name ? msft.name : "", rememberMe: rememberMeSelected.toString() });
-                pxt.auth.client().loginAsync(msft.id, rememberMeSelected, { hash: location.hash })
-            }
-        })
-
-        const onRememberMeChecked = (newValue: boolean) => {
-            tickEvent("skillmap.signindialog.rememberme", { rememberMe: newValue.toString() });
-            this.setState({ checkboxSelected: newValue });
+        const signInAsync = async (provider: pxt.AppCloudProvider, rememberMe: boolean): Promise<void> => {
+            pxt.tickEvent(`identity.loginClick`, { provider: provider.name!, rememberMe: rememberMe.toString() });
+            await pxt.auth.client().loginAsync(provider.id, rememberMe, { hash: location.hash });
         }
 
-        return <Modal title={activityPrompt ? lf("Save your Completed Activity") : lf("Sign into MakeCode Arcade")} onClose={this.handleOnClose} actions={buttons} className="sign-in">
-            <div className="description">
-                <p>{lf("Sign in with your Microsoft Account. We'll save your projects to the cloud, where they're accessible from anywhere.")}</p>
-
-            <div className="container">
-                    { activityPrompt && <img src={resolvePath("/assets/cloud-user.svg")} alt={signInIconAltText} className="icon cloud-user"/> }
-                    <p>{ lf("Don't have a Microsoft Account? Start signing in to create one!")}
-                        <a href="https://aka.ms/cloudsave" target="_blank" onClick={() => {
-                            tickEvent("skillmap.signindialog.learn");
-                            window.open("https://aka.ms/cloudsave", "_blank");
-                        }}>
-                            <i className="fas fa-external-link-alt" aria-hidden={true} />{lf("Learn more")}
-                        </a>
-                    </p>
-                </div>
-                <div className="remember">
-                    <Checkbox id="sign-in-remember-me" label={lf("Remember me")} onChange={onRememberMeChecked} isChecked={rememberMeSelected} />
-                </div>
-            </div>
-        </Modal>
-    }
-
-    async handleSigninClick(provider: pxt.AppCloudProvider) {
-        const rememberMeSelected = this.state.checkboxSelected ?? false;
-        pxt.tickEvent(`skillmap.signindialog.signin`, { provider: provider.id, rememberMe: rememberMeSelected.toString() });
-        await pxt.auth.client().loginAsync(provider.id, rememberMeSelected, { hash: location.hash });
-    }
-
-    handleRememberMeClick() {
-        const rememberMeSelected = this.state.checkboxSelected ?? false;
-        const rememberMe = !rememberMeSelected;
-        tickEvent("skillmap.signindialog.rememberme", { rememberMe: rememberMe.toString() });
-        this.setState({ checkboxSelected: rememberMe });
+        return <>
+            {activityPrompt && <SignInModal appMessage={lf("Nice work! You've completed this activity.")} onSignIn={signInAsync} onClose={this.handleOnClose} />}
+            {!activityPrompt && <SignInModal onSignIn={signInAsync} onClose={this.handleOnClose} />}
+        </>
     }
 
     renderDeleteAccountModal() {
@@ -631,7 +603,7 @@ function mapStateToProps(state: SkillMapState, ownProps: any) {
         hasPendingModals: state.modalQueue?.length && state.modalQueue?.length > 1,
         badge,
         signedIn: state.auth.signedIn,
-    }
+    } as AppModalProps
 }
 
 const mapDispatchToProps = {

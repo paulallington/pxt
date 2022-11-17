@@ -1,3 +1,5 @@
+/// <reference path="../localtypings/dom.d.ts" />
+
 namespace pxt.BrowserUtils {
     import Util = pxt.Util;
 

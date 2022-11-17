@@ -8,14 +8,14 @@ import { CloudStatus } from "./CloudStatus";
 import { dispatchShowLoginModal } from '../actions/dispatch';
 
 
-import { FocusTrap } from "react-common/controls/FocusTrap";
+import { FocusTrap } from "react-common/components/controls/FocusTrap";
 
 
 import { ActivityStatus, isActivityCompleted, getActivityStatus, isRewardNode } from '../lib/skillMapUtils';
 
 /* eslint-disable import/no-unassigned-import, import/no-internal-modules */
 import '../styles/infopanel.css'
-import { Button } from "react-common/controls/Button";
+import { Button } from "react-common/components/controls/Button";
 /* eslint-enable import/no-unassigned-import, import/no-internal-modules */
 
 interface InfoPanelProps {
@@ -83,12 +83,13 @@ export class InfoPanelImpl extends React.Component<InfoPanelProps> {
         const isMap = !node;
         const isActivity = node && !isRewardNode(node);
         const tags = isActivity && (node as MapActivity).tags || undefined;
+        const thumbnailAltText: string = lf("Thumbnail for {0} activity in skillmap {1}", !subtitle ? lf("starting") : title, !subtitle ? title : subtitle);
 
         const hasCloudSync = pxt.auth.hasIdentity();
         return <div className="info-panel" ref={this.handleRef}>
             <div className="info-panel-image">
                 {imageUrl
-                ? <img src={imageUrl} alt={lf("Preview of activity content")} />
+                ? <img src={imageUrl} alt={thumbnailAltText} />
                 : <i className={`fas fa-image`} />}
             </div>
             <div className="info-panel-content">
@@ -181,7 +182,7 @@ function mapStateToProps(state: SkillMapState, ownProps: any) {
         details,
         completedHeaderId,
         signedIn: state.auth.signedIn
-    };
+    } as InfoPanelProps
 }
 
 const mapDispatchToProps = {

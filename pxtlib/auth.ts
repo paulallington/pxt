@@ -102,7 +102,6 @@ namespace pxt.auth {
         private state$: Readonly<State>;
 
         constructor() {
-            pxt.Util.assert(!_client);
             // Set global instance.
             _client = this;
         }
@@ -127,6 +126,10 @@ namespace pxt.auth {
         protected abstract onProfileDeleted(userId: string): Promise<void>;
         protected abstract onApiError(err: any): Promise<void>;
         protected abstract onStateCleared(): Promise<void>
+
+        public async authTokenAsync(): Promise<string> {
+            return await pxt.storage.shared.getAsync(AUTH_CONTAINER, CSRF_TOKEN_KEY);
+        }
 
         /**
          * Starts the process of authenticating the user against the given identity
@@ -681,6 +684,11 @@ namespace pxt.auth {
 
     export function userName(user: pxt.auth.UserProfile): string {
         return user?.idp?.displayName ?? user?.idp?.username ?? EMPTY_USERNAME;
+    }
+
+    export function firstName(user: pxt.auth.UserProfile): string {
+        const userName = pxt.auth.userName(user);
+        return userName?.split(" ").shift() || userName;
     }
 
     export function userInitials(user: pxt.auth.UserProfile): string {

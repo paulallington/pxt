@@ -1,4 +1,6 @@
 /// <reference path="../lib/skillMap.d.ts" />
+/// <reference path="../../../localtypings/react.d.ts" />
+
 import * as React from "react";
 
 import { connect } from 'react-redux';
@@ -10,9 +12,9 @@ import { isLocal, resolvePath, tickEvent } from "../lib/browserUtils";
 import { isActivityCompleted } from "../lib/skillMapUtils";
 import * as authClient from '../lib/authClient';
 import { Dropdown } from "./Dropdown";
-import { Button } from "react-common/controls/Button";
-import { MenuBar } from "react-common/controls/MenuBar";
-import { MenuDropdown, MenuItem } from "react-common/controls/MenuDropdown";
+import { Button } from "react-common/components/controls/Button";
+import { MenuBar } from "react-common/components/controls/MenuBar";
+import { MenuDropdown, MenuItem } from "react-common/components/controls/MenuDropdown";
 
 
 interface HeaderBarProps {
@@ -139,8 +141,11 @@ export class HeaderBarImpl extends React.Component<HeaderBarProps> {
             });
         }
 
+        // Google user picture URL must have referrer policy set to no-referrer
         const avatarElem = this.avatarPicUrl()
-            ? <div className="avatar"><img src={this.avatarPicUrl()} aria-hidden="true" alt={lf("Profile Image")}/></div>
+            ? <div className="avatar">
+                <img src={this.avatarPicUrl()} alt={lf("Profile Image")} referrerPolicy="no-referrer" aria-hidden="true" />
+            </div>
             : undefined;
 
         const initialsElem = <span><div className="avatar-initials" aria-hidden="true">{pxt.auth.userInitials(profile)}</div></span>
@@ -243,7 +248,7 @@ function mapStateToProps(state: SkillMapState, ownProps: any) {
         signedIn: state.auth.signedIn,
         profile: state.auth.profile,
         preferences: state.auth.preferences
-    }
+    } as HeaderBarProps
 }
 
 

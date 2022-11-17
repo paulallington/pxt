@@ -75,6 +75,7 @@ interface AppState {
     cloudSyncCheckHasFinished: boolean;
     badgeSyncLock: boolean;
     showingSyncLoader?: boolean;
+    forcelang?: string;
 }
 
 class AppImpl extends React.Component<AppProps, AppState> {
@@ -176,10 +177,14 @@ class AppImpl extends React.Component<AppProps, AppState> {
             pxt.BrowserUtils.setCookieLang(useLang!);
             pxt.Util.setUserLanguage(useLang!);
         }
+
+        if (force && useLang) {
+            this.setState({ forcelang: useLang });
+        }
     }
 
     protected async fetchAndParseSkillMaps(source: MarkdownSource, url: string) {
-        const result = await getMarkdownAsync(source, url);
+        const result = await getMarkdownAsync(source, url, this.state.forcelang);
 
         const md = result?.text;
         const fetched = result?.identifier;
@@ -221,7 +226,7 @@ class AppImpl extends React.Component<AppProps, AppState> {
 
                 this.setState({ error: undefined });
             } catch (err) {
-                this.handleError(err);
+                this.handleError(err as any);
             }
         } else {
             this.setState({ error: lf("No content loaded.") })
@@ -383,7 +388,7 @@ class AppImpl extends React.Component<AppProps, AppState> {
 
     render() {
         const { skillMaps, activityOpen, backgroundImageUrl, theme } = this.props;
-        const { error, showingSyncLoader } = this.state;
+        const { error, showingSyncLoader, forcelang } = this.state;
         const maps = Object.keys(skillMaps).map((id: string) => skillMaps[id]);
         return (<div className={`app-container ${pxt.appTarget.id}`}>
                 <HeaderBar />
@@ -394,11 +399,11 @@ class AppImpl extends React.Component<AppProps, AppState> {
                 <div className={`skill-map-container ${activityOpen ? "hidden" : ""}`} style={{ backgroundColor: theme.backgroundColor }}>
                     { error
                         ? <div className="skill-map-error">{error}</div>
-                        : <SkillGraphContainer maps={maps} backgroundImageUrl={backgroundImageUrl} />
+                        : <SkillGraphContainer maps={maps} backgroundImageUrl={backgroundImageUrl} backgroundColor={theme.backgroundColor} strokeColor={theme.strokeColor} />
                     }
                     { !error && <InfoPanel onFocusEscape={this.focusCurrentActivity} />}
                 </div>
-                <MakeCodeFrame onWorkspaceReady={this.onMakeCodeFrameLoaded}/>
+                <MakeCodeFrame forcelang={forcelang} onWorkspaceReady={this.onMakeCodeFrameLoaded}/>
                 <AppModal />
                 <UserProfile />
             </div>);

@@ -9,6 +9,7 @@ import  { dispatchSetHeaderIdForActivity, dispatchCloseActivity, dispatchSaveAnd
 
 /* eslint-disable import/no-unassigned-import, import/no-internal-modules */
 import '../styles/makecode-editor.css'
+import { ShareData } from "react-common/components/share/Share";
 /* eslint-enable import/no-unassigned-import, import/no-internal-modules */
 
 interface MakeCodeFrameProps {
@@ -21,8 +22,10 @@ interface MakeCodeFrameProps {
     activityType: MapActivityType;
     carryoverCode: boolean;
     previousHeaderId?: string;
+    forcelang?: string;
     progress?: ActivityState;
     shareHeaderId?: string;
+    shareProjectName?: string;
     signedIn?: boolean;
     highContrast?: boolean;
     pageSourceUrl: string;
@@ -30,7 +33,7 @@ interface MakeCodeFrameProps {
     dispatchCloseActivity: (finished?: boolean) => void;
     dispatchSaveAndCloseActivity: () => void;
     dispatchUpdateUserCompletedTags: () => void;
-    dispatchSetShareStatus: (headerId?: string, url?: string) => void;
+    dispatchSetShareStatus: (headerId?: string, projectName?: string, data?: ShareData) => void;
     dispatchShowLoginPrompt: () => void;
     dispatchSetCloudStatus: (headerId: string, status: string) => void;
     onWorkspaceReady: (sendMessageAsync: (message: any) => Promise<any>) => void;
@@ -113,7 +116,7 @@ class MakeCodeFrameImpl extends React.Component<MakeCodeFrameProps, MakeCodeFram
     }
 
     render() {
-        const {title, activityId } = this.props;
+        const { title, activityId, forcelang } = this.props;
         const { frameState, loadPercent } = this.state;
 
         const loadingText =  lf("Loading...")
@@ -126,7 +129,7 @@ class MakeCodeFrameImpl extends React.Component<MakeCodeFrameProps, MakeCodeFram
         if (editorUrl.charAt(editorUrl.length - 1) === "/" && !isLocal()) {
             url = editorUrl.substr(0, editorUrl.length - 1);
         }
-        url += `?controller=1&skillsMap=1&noproject=1&nocookiebanner=1&ws=browser`;
+        url += `?controller=1&skillsMap=1&noproject=1&nocookiebanner=1&ws=browser${forcelang ? `?forcelang=${forcelang}` : ""}`;
 
         /* eslint-disable @microsoft/sdl/react-iframe-missing-sandbox */
         return <div className="makecode-frame-outer" style={{ display: activityId ? "block" : "none" }}>
@@ -263,15 +266,16 @@ class MakeCodeFrameImpl extends React.Component<MakeCodeFrameProps, MakeCodeFram
     }
 
     protected async shareProjectAsync() {
-        const { shareHeaderId, dispatchSetShareStatus } = this.props;
+        const { shareHeaderId, shareProjectName, dispatchSetShareStatus } = this.props;
 
         const resp = (await this.sendMessageAsync({
             type: "pxteditor",
             action: "shareproject",
-            headerId: shareHeaderId
+            headerId: shareHeaderId,
+            projectName: shareProjectName
         })) as any;
 
-        dispatchSetShareStatus(shareHeaderId, resp.resp.shortid);
+        dispatchSetShareStatus(shareHeaderId, shareProjectName, resp.resp);
         this.setState({
             pendingShare: false
         });
@@ -334,10 +338,12 @@ class MakeCodeFrameImpl extends React.Component<MakeCodeFrameProps, MakeCodeFram
 }
 
 function mapStateToProps(state: SkillMapState, ownProps: any) {
-    const shareHeaderId = !state.shareState?.url ? state.shareState?.headerId : undefined;
+    const shareHeaderId = !state.shareState?.data ? state.shareState?.headerId : undefined;
+    const shareProjectName = state.shareState?.projectName;
 
     if (!state || !state.editorView) return {
-        shareHeaderId
+        shareHeaderId,
+        shareProjectName
     };
 
     const { currentActivityId, currentMapId, currentHeaderId, state: saveState, allowCodeCarryover, previousHeaderId } = state.editorView;
@@ -362,10 +368,11 @@ function mapStateToProps(state: SkillMapState, ownProps: any) {
         progress,
         save: saveState === "saving",
         shareHeaderId,
+        shareProjectName,
         signedIn: state.auth.signedIn,
         highContrast: state.auth.preferences?.highContrast,
         pageSourceUrl: state.pageSourceUrl
-    }
+    } as MakeCodeFrameProps
 }
 
 function setElementVisible(selector: string, visible: boolean) {
