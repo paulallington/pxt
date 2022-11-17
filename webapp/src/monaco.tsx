@@ -416,15 +416,15 @@ export class Editor extends toolboxeditor.ToolboxEditor {
             return;
         }
 
-        const proceed = confirm("If you go to Blocks your Python code will be re-ordered and some variable names may " +
-            "change, are you sure you want to continue?");
-        if (proceed) {
-            let mainPkg = pkg.mainEditorPkg()
-            const pyFile = mainPkg.files[pxt.MAIN_PY].content
-            mainPkg.setContentAsync("main_backup.txt", pyFile)
-        }else {
-            return;
-        }
+        // const proceed = confirm("If you go to Blocks your Python code will be re-ordered and some variable names may " +
+        //     "change, are you sure you want to continue?");
+        // if (proceed) {
+        //     let mainPkg = pkg.mainEditorPkg()
+        //     const pyFile = mainPkg.files[pxt.MAIN_PY].content
+        //     mainPkg.setContentAsync("main_backup.txt", pyFile)
+        // }else {
+        //     return;
+        // }
 
         const isWinApp = pxt.BrowserUtils.isWinRT();
         if (isWinApp) {
