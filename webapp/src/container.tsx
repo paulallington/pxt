@@ -381,7 +381,7 @@ class JavascriptMenuItem extends data.Component<ISettingsProps, {}> {
     }
 
     renderCore() {
-        return <BaseMenuItemProps className="javascript-menuitem" icon="xicon js" text="JavaScript" title={lf("Convert code to JavaScript")} onClick={this.onClick} isActive={this.isActive} parent={this.props.parent} />
+        return <BaseMenuItemProps className="javascript-menuitem" icon="xicon js" text="TypeScript" title={lf("Convert code to TypeScript")} onClick={this.onClick} isActive={this.isActive} parent={this.props.parent} />
     }
 }
 
@@ -478,11 +478,13 @@ interface IEditorSelectorProps extends ISettingsProps {
 }
 
 export class EditorSelector extends data.Component<IEditorSelectorProps, {}> {
-    private readonly hideBlockCheck: boolean;
+    private readonly disableBlocks: boolean;
+    private readonly disableJavascript: boolean;
     constructor(props: ISettingsProps) {
         super(props);
-        // this.hideBlockCheck = pxt.BrowserUtils.renderBlocksCheck();
-        this.hideBlockCheck = false // override for now
+        // this.disableBlocks = pxt.BrowserUtils.renderBlocksCheck();
+        this.disableBlocks = false // override for now
+        this.disableJavascript = pxt.BrowserUtils.renderJavaScriptCheck();
     }
 
     renderCore() {
@@ -491,9 +493,9 @@ export class EditorSelector extends data.Component<IEditorSelectorProps, {}> {
         const tsOnly = languageRestriction === pxt.editor.LanguageRestriction.JavaScriptOnly;
         const pyOnly = languageRestriction === pxt.editor.LanguageRestriction.PythonOnly;
         const blocksOnly = languageRestriction === pxt.editor.LanguageRestriction.BlocksOnly;
-        const noJavaScript = languageRestriction === pxt.editor.LanguageRestriction.NoJavaScript;
+        const noJavaScript = languageRestriction === pxt.editor.LanguageRestriction.NoJavaScript || this.disableJavascript;
         const noPython = languageRestriction === pxt.editor.LanguageRestriction.NoPython;
-        const noBlocks = languageRestriction === pxt.editor.LanguageRestriction.NoBlocks || this.hideBlockCheck;
+        const noBlocks = languageRestriction === pxt.editor.LanguageRestriction.NoBlocks || this.disableBlocks;
         const javaScript = pxt.appTarget.appTheme.javaScript;
 
         // show python in toggle if: python editor currently active, or blocks editor active & saved language pref is python

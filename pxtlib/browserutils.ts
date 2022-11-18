@@ -19,6 +19,15 @@ namespace pxt.BrowserUtils {
         }
     }
 
+    export function renderJavaScriptCheck() {
+        let urlQuery = Util.parseQueryString(window.location.href);
+        if (urlQuery["hideJavascript"]){
+            console.log("JavaScript hidden from url arg");
+            return true;
+        }
+        return false;
+    }
+
     export function renderBlocksCheck() {
         let urlQuery = Util.parseQueryString(window.location.href);
         if (urlQuery["hide_blocks"]){
