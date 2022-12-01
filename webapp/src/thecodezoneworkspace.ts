@@ -46,6 +46,13 @@ async function getAsync(h: Header): Promise<pxt.workspace.File> {
 }
 
 async function setAsync(h: Header, prevVer: any, text?: ScriptText) {
+    let autoSaveEnabled = pxt.BrowserUtils.autoSaveEnabled();
+
+    if (!autoSaveEnabled){
+        console.log("Auto Save Disabled")
+        return Promise.resolve()
+    }
+
     console.log("setAsync in cz", h, prevVer, text);
 
     if (text) {

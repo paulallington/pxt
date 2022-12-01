@@ -374,7 +374,7 @@ export class Editor extends toolboxeditor.ToolboxEditor {
 
     private handleFlyoutWheel = (e: WheelEvent) => e.stopPropagation();
     private handleFlyoutScroll = (e: WheelEvent) => e.stopPropagation();
-    private hideBlocks: boolean;
+    private readonly hideBlocks: boolean;
 
     constructor(parent: pxt.editor.IProjectView) {
         super(parent);

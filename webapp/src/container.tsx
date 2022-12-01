@@ -482,8 +482,7 @@ export class EditorSelector extends data.Component<IEditorSelectorProps, {}> {
     private readonly disableJavascript: boolean;
     constructor(props: ISettingsProps) {
         super(props);
-        // this.disableBlocks = pxt.BrowserUtils.renderBlocksCheck();
-        this.disableBlocks = false // override for now
+        this.disableBlocks = pxt.BrowserUtils.renderBlocksCheck();
         this.disableJavascript = pxt.BrowserUtils.renderJavaScriptCheck();
     }
 

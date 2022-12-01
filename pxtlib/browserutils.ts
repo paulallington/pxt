@@ -28,9 +28,18 @@ namespace pxt.BrowserUtils {
         return false;
     }
 
+    export function autoSaveEnabled() {
+        let urlQuery = Util.parseQueryString(window.location.href);
+        if (urlQuery["autoSaveEnabled"]){
+            console.log("Auto Save Enabled");
+            return true;
+        }
+        return false;
+    }
+
     export function renderBlocksCheck() {
         let urlQuery = Util.parseQueryString(window.location.href);
-        if (urlQuery["hide_blocks"]){
+        if (urlQuery["hideBlocks"]){
             console.log("Blocks hidden from url arg");
             return true;
         }
