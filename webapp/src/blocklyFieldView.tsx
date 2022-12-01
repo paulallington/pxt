@@ -192,8 +192,10 @@ export class FieldEditorView<U> implements pxt.react.FieldEditorView<U> {
 
     protected handleOutsideClick = (ev: MouseEvent) => {
         if (!this.contentBounds) return;
+        this.contentBounds.top = 0
+        this.contentBounds.height += 50
 
-        if (!inBounds(ev.clientX, ev.clientY + 50, this.contentBounds)) {
+        if (!inBounds(ev.clientX, ev.clientY, this.contentBounds)) {
             ev.stopPropagation();
             this.hide();
         }
