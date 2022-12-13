@@ -535,11 +535,7 @@ export class Editor extends toolboxeditor.ToolboxEditor {
                                         }
                                         xml = resp.outText;
                                         Util.assert(!!xml);
-
-                                        const pythonFile = pkg.mainEditorPkg().files[pxt.MAIN_PY];
-                                        pkg.mainEditorPkg().removeFileAsync(pythonFile.name)
-                                            .then(() => pkg.mainEditorPkg().saveFilesAsync())
-                                            .then(() => this.parent.reloadHeaderAsync())
+                                        pkg.mainEditorPkg().removeFileAsync(pkg.mainEditorPkg().files[pxt.MAIN_PY].name)
 
                                         return mainPkg.setContentAsync(blockFile, xml)
                                             .then(() => this.parent.setFile(mainPkg.files[blockFile]));
