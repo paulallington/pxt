@@ -11,7 +11,6 @@ import * as identity from "./identity";
 import * as cloudsync from "./cloudsync";
 import * as pkg from "./package";
 import * as ImmersiveReader from "./immersivereader";
-import {showWinAppDeprecateAsync} from "./dialogs";
 import { fireClickOnEnter } from "./util";
 
 import Util = pxt.Util;
@@ -288,7 +287,7 @@ export class SettingsMenu extends data.Component<SettingsMenuProps, SettingsMenu
         const showSimCollapse = !readOnly && !isController && !!targetTheme.simCollapseInMenu;
         const showGreenScreen = targetTheme.greenScreen || /greenscreen=1/i.test(window.location.href);
         const showPrint = targetTheme.print && !pxt.BrowserUtils.isIE();
-        const showProjectSettings = targetTheme.showProjectSettings || pxt.editor.experiments.isEnabled("palettePicker");
+        const showProjectSettings = targetTheme.showProjectSettings;
         const docItems = targetTheme.docMenu && targetTheme.docMenu.filter(d => !d.tutorial);
         const usbIcon = pxt.appTarget.appTheme.downloadDialogTheme?.deviceIcon || "usb";
         const showDelete = pxt.appTarget.appTheme.showDelete;
@@ -367,11 +366,6 @@ class JavascriptMenuItem extends data.Component<ISettingsProps, {}> {
     }
 
     protected onClick = (): void => {
-        const isWinApp = pxt.BrowserUtils.isWinRT();
-        if (isWinApp) {
-            showWinAppDeprecateAsync();
-            return;
-        }
         pxt.tickEvent("menu.javascript", undefined, { interactiveConsent: true });
         this.props.parent.openJavaScript();
     }
@@ -391,12 +385,6 @@ class PythonMenuItem extends data.Component<ISettingsProps, {}> {
     }
 
     protected onClick = (): void => {
-        const isWinApp = pxt.BrowserUtils.isWinRT();
-        if (isWinApp) {
-            showWinAppDeprecateAsync();
-            return;
-        }
-
         pxt.tickEvent("menu.python", undefined, { interactiveConsent: true });
         this.props.parent.openPython();
     }
