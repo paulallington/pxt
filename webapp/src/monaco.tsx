@@ -403,9 +403,21 @@ export class Editor extends toolboxeditor.ToolboxEditor {
     }
 
     public openBlocks() {
-        this.openBlocksAsync();
+        this.openBlocksWarning();
     }
 
+    public async openBlocksWarning() {
+
+        core.confirmAsync({
+            header: lf("Moving To Blocks Will Reset Your Python Code"),
+            body: lf("You are about to switch to Blocks. Doing this will reset your Python code. Do you want to continue?"),
+            agreeClass: "red",
+            agreeIcon: "checkmark",
+            agreeLbl: lf("Yes"),
+        }).then(async res => {
+            if (res) await this.openBlocksAsync();
+        })
+    }
 
     public async openBlocksAsync() {
         pxt.tickEvent(`typescript.showBlocks`);
@@ -415,16 +427,6 @@ export class Editor extends toolboxeditor.ToolboxEditor {
             alert("Blocks are currently disabled")
             return;
         }
-
-        // const proceed = confirm("If you go to Blocks your Python code will be re-ordered and some variable names may " +
-        //     "change, are you sure you want to continue?");
-        // if (proceed) {
-        //     let mainPkg = pkg.mainEditorPkg()
-        //     const pyFile = mainPkg.files[pxt.MAIN_PY].content
-        //     mainPkg.setContentAsync("main_backup.txt", pyFile)
-        // }else {
-        //     return;
-        // }
 
         const isWinApp = pxt.BrowserUtils.isWinRT();
         if (isWinApp) {
@@ -543,6 +545,12 @@ export class Editor extends toolboxeditor.ToolboxEditor {
                                         }
                                         xml = resp.outText;
                                         Util.assert(!!xml);
+
+                                        const pythonFile = pkg.mainEditorPkg().files[pxt.MAIN_PY];
+                                        pkg.mainEditorPkg().removeFileAsync(pythonFile.name)
+                                            .then(() => pkg.mainEditorPkg().saveFilesAsync())
+                                            .then(() => this.parent.reloadHeaderAsync())
+
                                         return mainPkg.setContentAsync(blockFile, xml)
                                             .then(() => this.parent.setFile(mainPkg.files[blockFile]));
                                     })
