@@ -155,6 +155,7 @@ class AssetSidebarImpl extends React.Component<AssetSidebarProps, AssetSidebarSt
 
     protected showPaletteModal = () => {
         this.setState({ showPaletteModal: true });
+        pxt.tickEvent("palette.open");
     }
 
     protected hidePaletteModal = (paletteChanged: boolean) => {
@@ -231,8 +232,9 @@ class AssetSidebarImpl extends React.Component<AssetSidebarProps, AssetSidebarSt
                     leftIcon="icon trash"
                     onClick={this.showDeleteModal} />}
                 <Button className="teal asset-palette-button"
-                    title={lf("Color Palette")}
                     label={lf("Color Palette")}
+                    title={lf("Open the color palette")}
+                    ariaLabel={lf("Open the color palette")}
                     leftIcon="fas fa-palette"
                     onClick={this.showPaletteModal}
                 />

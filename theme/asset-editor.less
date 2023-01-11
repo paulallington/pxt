@@ -243,3 +243,23 @@
         transform: rotate(90deg);
     }
 }
+
+.palette-transparent-button.common-button {
+    background: none;
+    border: none;
+    &.disabled {
+        background: none;
+        border: none;
+        color: @grey;
+    }
+}
+
+.palette-apply-button.common-button.disabled.green,
+.palette-done-button.common-button.disabled.teal {
+    background-color: @grey;
+    color: @white;
+}
+
+.invalid-palette-name {
+    color: @red;
+}

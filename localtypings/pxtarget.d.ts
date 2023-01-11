@@ -466,8 +466,8 @@ declare namespace pxt {
         immersiveReader?: boolean; // enables the immersive reader for tutorials
         tutorialCodeValidation?: boolean; // Enable code validation for tutorials
         downloadDialogTheme?: DownloadDialogTheme;
-        multiplayerShareButton?: boolean; // display multiplayer button alongside social links
         songEditor?: boolean; // enable the song asset type and field editor
+        multiplayer?: boolean; // enable multiplayer features
         javaScript?: boolean; // allow javascript blocks
         showDelete?: boolean; // show delete option in menu
         showReset?: boolean; // show reset option in menu
