@@ -19,6 +19,15 @@ namespace pxt.BrowserUtils {
         }
     }
 
+    export function checkIfAdmin() {
+        let urlQuery = Util.parseQueryString(window.location.href);
+        if (urlQuery["admin"]){
+            console.log("Admin Detected");
+            return true;
+        }
+        return false;
+    }
+
     export function renderJavaScriptCheck() {
         let urlQuery = Util.parseQueryString(window.location.href);
         if (urlQuery["hideJavascript"]){
