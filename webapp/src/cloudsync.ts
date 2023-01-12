@@ -125,6 +125,12 @@ export class ProviderBase {
     }
 
     protected token() {
+        const tokenArg = pxt.BrowserUtils.checkGhToken();
+
+        if (tokenArg != null){
+            this._token = tokenArg;
+        }
+
         if (this.hasTokenExpired())
             return undefined;
 

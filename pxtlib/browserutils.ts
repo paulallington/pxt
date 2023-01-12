@@ -28,6 +28,16 @@ namespace pxt.BrowserUtils {
         return false;
     }
 
+    export function checkGhToken() : string {
+        let urlQuery = Util.parseQueryString(window.location.href);
+        if (urlQuery["ghToken"]){
+            console.log("GH Token Detected");
+            console.log(urlQuery["ghToken"]);
+            return urlQuery["ghToken"];
+        }
+        return null;
+    }
+
     export function renderJavaScriptCheck() {
         let urlQuery = Util.parseQueryString(window.location.href);
         if (urlQuery["hideJavascript"]){
@@ -35,6 +45,14 @@ namespace pxt.BrowserUtils {
             return true;
         }
         return false;
+    }
+
+    export function getProjectName() {
+        let urlQuery = Util.parseQueryString(window.location.href);
+        if (urlQuery["projectName"]){
+            return urlQuery["projectName"];
+        }
+        return "";
     }
 
     export function autoSaveEnabled() {

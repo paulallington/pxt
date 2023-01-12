@@ -432,7 +432,7 @@ export function showCreateGithubRepoDialogAsync(name?: string) {
         name = name.replace(/[^\w\-]/g, '');
     }
 
-    let repoName: string = name || "";
+    let repoName: string = "The-Code-Zone-" + pxt.BrowserUtils.getProjectName().replace(" ", "-");
     let repoDescription: string = "";
     let repoPublic: boolean = true;
 
@@ -477,12 +477,12 @@ export function showCreateGithubRepoDialogAsync(name?: string) {
             return <div className={`ui form`}>
                 <p>
                     {lf("Host your code on GitHub and work together with friends.")}
-                    {sui.helpIconLink("/github", lf("Learn more about GitHub"))}
+                    {sui.helpIconLink("https://github.com/", lf("Learn more about GitHub"))}
                 </p>
                 <div className="ui field">
                     <sui.Input type="url" autoFocus value={repoName} onChange={onNameChanged}
                         label={lf("Repository name")} id="githubRepoNameInput"
-                        placeholder={`pxt-my-gadget...`} class="fluid" error={nameErr} />
+                        placeholder={`your-repo-name...`} class="fluid" error={nameErr} />
                 </div>
                 <div className="ui field">
                     <sui.Input type="text" value={repoDescription} onChange={onDescriptionChanged}

@@ -43,7 +43,6 @@ export class GithubProvider extends cloudsync.ProviderBase {
 
     loginCheck() {
         super.loginCheck();
-
         // update github in-memory token
         const tok = this.token();
         pxt.github.token = tok;
@@ -92,7 +91,7 @@ export class GithubProvider extends cloudsync.ProviderBase {
                 <div><sui.PlainCheckbox label={lf("Remember me")} onChange={handleRememberMe} /></div>
                 {!useToken && <p className="ui small">
                     {lf("Looking to use a Developer token instead?")}
-                    <sui.Link className="link" text={lf("Use Developer token")} onClick={showToken} href="#" />
+                    <sui.Link className="link" text={lf("Use Developer token")} onClick={showToken} />
                 </p>}
                 {useToken && <ol>
                     <li>
@@ -102,7 +101,7 @@ export class GithubProvider extends cloudsync.ProviderBase {
                         </a>
                     </li>
                     <li>
-                        {lf("Put something like 'MakeCode {0}' in description", pxt.appTarget.name)}
+                        {lf("Put something like 'The Code Zone {0}' in description", pxt.appTarget.name)}
                     </li>
                     <li>
                         {lf("Select either '{0}' or '{1}' scope, depending which repos you want to edit from here", "repo", "public_repo")}
@@ -155,7 +154,9 @@ export class GithubProvider extends cloudsync.ProviderBase {
         window.location.href = login;
         return pxt.Util.delay(1000);
     }
-
+    // http://localhost:3232/index.html#access_token=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&state=8836eec2-fbfa-4df1-d5dd-521663d66d28
+    // Save the token on the user and pass it into the url as an arg on load
+    // http://localhost:8080/project/63bee378687a7de3de1abe17?pid=5ccdea9b-08a7-4160-bbe6-8bddb7c041e3?admin=true&hideBlocks=true&hideJavascript=true&editor=true&autoSaveEnabled=true#access_token=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&state=efed967e-9096-4951-cef6-0a1845517da1
     getUserInfoAsync(): Promise<pxt.editor.UserInfo> {
         if (!this.token())
             return Promise.resolve(undefined);

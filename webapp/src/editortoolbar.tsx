@@ -353,7 +353,7 @@ export class EditorToolbar extends data.Component<ISettingsProps, EditorToolbarS
         const mobile = View.Mobile;
         const computer = View.Computer;
         const isAdmin : boolean = pxt.BrowserUtils.checkIfAdmin();
-        const allowGitHub : boolean = pxt.BrowserUtils.renderJavaScriptCheck();
+        const preventGitHub : boolean = pxt.BrowserUtils.renderJavaScriptCheck();
 
         let downloadButtonClasses = "";
         let saveButtonClasses = "";
@@ -385,7 +385,7 @@ export class EditorToolbar extends data.Component<ISettingsProps, EditorToolbarS
 
                     <div className={`ui right ${showSave ? "labeled" : ""} input projectname-input projectname-computer`}>
                         {showProjectRename && this.getSaveInput(showSave, "fileNameInput2", projectName, showProjectRenameReadonly)}
-                        {isAdmin || !allowGitHub && showGithub && <githubbutton.GithubButton parent={this.props.parent} key={`githubbtn${computer}`} />}
+                        {(isAdmin || !preventGitHub) && showGithub && <githubbutton.GithubButton parent={this.props.parent} key={`githubbtn${computer}`} />}
                         <identity.CloudSaveStatus headerId={header.id} />
                     </div>
                 </div>}
