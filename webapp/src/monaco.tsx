@@ -409,8 +409,8 @@ export class Editor extends toolboxeditor.ToolboxEditor {
     public async openBlocksWarning() {
 
         core.confirmAsync({
-            header: lf("Moving To Blocks Will Regenerate Your Python Code"),
-            body: lf("You are about to switch to Blocks. Doing this will regenerate your Python code & move functions, variables & events around. Do you want to continue?"),
+            header: lf("Moving To Blocks Will Regenerate Your Code"),
+            body: lf("You are about to switch to Blocks. Doing this will regenerate your code & move functions, variables & events around. Do you want to continue?"),
             agreeClass: "red",
             agreeIcon: "checkmark",
             agreeLbl: lf("Yes"),

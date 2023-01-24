@@ -468,6 +468,7 @@ declare namespace pxt {
         downloadDialogTheme?: DownloadDialogTheme;
         songEditor?: boolean; // enable the song asset type and field editor
         multiplayer?: boolean; // enable multiplayer features
+        shareToKiosk?: boolean; // enable sharing to a kiosk
         javaScript?: boolean; // allow javascript blocks
         showDelete?: boolean; // show delete option in menu
         showReset?: boolean; // show reset option in menu
@@ -536,6 +537,7 @@ declare namespace pxt {
         hash?: string;
         usedBlocks: Map<number>;
         snippetBlocks: Map<Map<number>>;
+        highlightBlocks: Map<Map<number>>;
     }
 
     interface PackageApiInfo {
@@ -639,6 +641,10 @@ declare namespace pxt.editor {
         NoBlocks = "no-blocks",
         NoPython = "no-python",
         NoJavaScript = "no-javascript"
+    }
+
+    // Placeholder for IProjectView defined in pxteditor.d.ts
+    interface IProjectView {
     }
 }
 
@@ -890,6 +896,7 @@ declare namespace ts.pxtc {
         paramHelp?: pxt.Map<string>;
         // foo.defl=12 -> paramDefl: { foo: "12" }; eg.: 12 in arg description will also go here
         paramDefl: pxt.Map<string>;
+        paramSnippets?: pxt.Map<ParamSnippet>;
         // this lists arguments that have .defl as opposed to just eg.: stuff
         explicitDefaults?: string[];
 
@@ -905,6 +912,11 @@ declare namespace ts.pxtc {
         alias?: string; // another symbol alias for this member
         pyAlias?: string; // optional python version of the alias
         blockAliasFor?: string; // qname of the function this block is an alias for
+    }
+
+    interface ParamSnippet {
+        ts?: string;
+        python?: string;
     }
 
     interface ParameterDesc {
@@ -1107,6 +1119,7 @@ declare namespace pxt.tutorial {
         customTs?: string; // custom typescript code loaded in a separate file for the tutorial
         tutorialValidationRules?: pxt.Map<boolean>; //a map of rules used in a tutorial and if the rules are activated
         globalBlockConfig?: TutorialBlockConfig; // concatenated `blockconfig.global` sections. Contains block configs applicable to all tutorial steps
+        globalValidationConfig?: CodeValidationConfig; // concatenated 'validation.global' sections. Contains validation config applicable to all steps
     }
 
     interface TutorialMetadata {
@@ -1142,6 +1155,30 @@ declare namespace pxt.tutorial {
         blocks?: TutorialBlockConfigEntry[]; // markdown fragment can contain multiple block definitions
     }
 
+    interface CodeValidationResult {
+        isValid: Boolean;
+        hint: any;
+    }
+
+    interface CodeValidationExecuteOptions {
+        parent: pxt.editor.IProjectView;
+        tutorialOptions: TutorialOptions;
+    }
+
+    interface CodeValidator {
+        enabled: boolean;
+        execute(options: CodeValidationExecuteOptions): Promise<CodeValidationResult>;
+    }
+    
+    interface CodeValidatorMetadata {
+        validatorType: string;
+        properties: pxt.Map<string>;
+    }
+
+    interface CodeValidationConfig {
+        validatorsMetadata: CodeValidatorMetadata[];
+    }
+    
     interface TutorialStepInfo {
         // Step metadata
         showHint?: boolean; // automatically displays hint
@@ -1166,6 +1203,9 @@ declare namespace pxt.tutorial {
 
         // concatenated `blockconfig.local` sections. Contains block configs applicable to the current step only
         localBlockConfig?: pxt.tutorial.TutorialBlockConfig;
+
+        // concatenated 'validation.local' sections. Contains config applicable to this step only.
+        localValidationConfig?: pxt.tutorial.CodeValidationConfig;
     }
 
     interface TutorialActivityInfo {
@@ -1198,6 +1238,7 @@ declare namespace pxt.tutorial {
         tutorialValidationRules?: pxt.Map<boolean>; //a map of rules used in a tutorial and if the rules are activated
         templateLoaded?: boolean; // if the template code has been loaded once, we skip
         globalBlockConfig?: TutorialBlockConfig; // concatenated `blockconfig.global` sections. Contains block configs applicable to all tutorial steps
+        globalValidationConfig?: CodeValidationConfig // concatenated 'validation.global' sections. Contains validation config applicable to all steps
     }
     interface TutorialCompletionInfo {
         // id of the tutorial
