@@ -12,6 +12,7 @@ import { Checkbox } from "../controls/Checkbox";
 import { SimRecorder } from "./ThumbnailRecorder";
 import { MultiplayerConfirmation } from "./MultiplayerConfirmation";
 import { addGameToKioskAsync } from "./Kiosk";
+import { pushNotificationMessage } from "../Notification";
 
 export interface ShareInfoProps {
     projectName: string;
@@ -109,6 +110,7 @@ export const ShareInfo = (props: ShareInfoProps) => {
     }
 
     const handleKioskSubmitClick = async () => {
+        pxt.tickEvent("share.kiosk.submitClicked");
         const gameId = pxt.Cloud.parseScriptId(shareData.url);
         if (kioskInputRef?.value) {
             const validKioskId = /^[a-zA-Z0-9]{6}$/.exec(kioskInputRef.value)?.[0];
@@ -116,11 +118,42 @@ export const ShareInfo = (props: ShareInfoProps) => {
                 setKioskSubmitSuccessful(true);
                 try {
                     await addGameToKioskAsync(validKioskId, gameId);
+                    pxt.tickEvent("share.kiosk.submitSuccessful");
+                    pushNotificationMessage({
+                        kind: 'info',
+                        text: lf("Game submitted to kiosk {0} successfully!", validKioskId),
+                        hc: false
+                    })
+
                 } catch (error) {
-                    pxt.log(error.message);
-                    //TODO: give some feedback to the user, no kiosk exists...
+                    pxt.tickEvent("share.kiosk.submitServerError");
+                    if (error.message === "Not Found") {
+                        pushNotificationMessage({
+                            kind: 'err',
+                            text: lf("Kiosk Code not found"),
+                            hc: false
+                        });
+                    } else {
+                        pushNotificationMessage({
+                            kind: 'err',
+                            text: lf("Something went wrong submitting game to kiosk {0}", validKioskId),
+                            hc: false
+                        });
+                    }
                 }
+            } else {
+                pushNotificationMessage({
+                    kind: 'err',
+                    text: lf("Invalid format for Kiosk Code"),
+                    hc: false
+                });
             }
+        } else {
+            pushNotificationMessage({
+                kind: 'err',
+                text: lf("Input a six-character kiosk Code"),
+                hc: false
+            });
         }
     }
 
@@ -147,8 +180,7 @@ export const ShareInfo = (props: ShareInfoProps) => {
     }
 
     const handleKioskHelpClick = () => {
-        pxt.log("this will lead the user to documentation");
-        const kioskDocumentationUrl = "https://arcade.makecode.com/developer/kiosk";
+        const kioskDocumentationUrl = "https://arcade.makecode.com/hardware/kiosk";
         window.open(kioskDocumentationUrl, "_blank");
     }
 
@@ -192,7 +224,7 @@ export const ShareInfo = (props: ShareInfoProps) => {
             return;
         }
 
-        const multiplayerHostUrl = pxt.multiplayer.makeHostLink(shareId);
+        const multiplayerHostUrl = pxt.multiplayer.makeHostLink(shareId, false);
 
         // NOTE: It is allowable to log the shareId here because this is within the multiplayer context.
         // In this context, the user has consented to allowing the shareId being made public.
@@ -358,13 +390,6 @@ export const ShareInfo = (props: ShareInfoProps) => {
                             </div>
                             <div className="project-share-actions">
                                 <div className="project-share-social">
-                                    {
-                                        pxt.appTarget?.appTheme?.shareToKiosk &&
-                                            <Button className="square-button gray mobile-portrait-hidden"
-                                            title={lf("Share to MakeCode Arcade Kiosk")}
-                                            leftIcon={"xicon kiosk"}
-                                            onClick={handleKioskClick} />
-                                    }
                                     <Button className="square-button gray embed mobile-portrait-hidden"
                                         title={lf("Show embed code")}
                                         leftIcon="fas fa-code"
@@ -389,12 +414,20 @@ export const ShareInfo = (props: ShareInfoProps) => {
                                         url={shareData?.url}
                                         type='whatsapp'
                                         heading={lf("Share on WhatsApp")} />
-                                    {navigator.share && <Button className="square-button device-share"
-                                        title={lf("Show device share options")}
-                                        ariaLabel={lf("Show device share options")}
-                                        leftIcon={"icon share"}
-                                        onClick={handleDeviceShareClick}
-                                    />}
+                                    {
+                                        pxt.appTarget?.appTheme?.shareToKiosk &&
+                                            <Button className="square-button gray mobile-portrait-hidden"
+                                            title={lf("Share to MakeCode Arcade Kiosk")}
+                                            leftIcon={"xicon kiosk"}
+                                            onClick={handleKioskClick} />
+                                    }
+                                    {
+                                        navigator.share && <Button className="square-button device-share"
+                                            title={lf("Show device share options")}
+                                            ariaLabel={lf("Show device share options")}
+                                            leftIcon={"icon share"}
+                                            onClick={handleDeviceShareClick} />
+                                    }
                                 </div>
                                 <Button
                                     className="menu-button project-qrcode"

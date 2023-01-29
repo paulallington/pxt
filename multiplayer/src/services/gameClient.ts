@@ -447,30 +447,12 @@ class GameClient {
 
         if (iconBuffer) {
             const unzipped = await gunzipAsync(iconBuffer);
-            const imgConv = new pxt.ImageConverter();
             const iconPalette = unzipped.slice(0, PALETTE_BUFFER_SIZE);
             const iconImage = unzipped.slice(PALETTE_BUFFER_SIZE);
-            const paletteAsTripletArray: number[][] = [];
-
-            for (let i = 0; i < 16; i++) {
-                paletteAsTripletArray.push([
-                    iconPalette[i * 3 + 2],
-                    iconPalette[i * 3 + 1],
-                    iconPalette[i * 3 + 0],
-                    255,
-                ]);
-            }
-            imgConv.setPalette(paletteAsTripletArray);
-            const stringifiedRefBuffer = String.fromCharCode.apply(
-                null,
-                iconImage as any as number[]
+            const iconPngDataUri = pxt.convertUint8BufferToPngUri(
+                iconPalette,
+                iconImage
             );
-
-            const jresFormattedIconBuffer = `data:image/x-mkcd-f4;base64,${btoa(
-                stringifiedRefBuffer
-            )}`;
-
-            const iconPngDataUri = imgConv.convert(jresFormattedIconBuffer);
 
             setCustomIconAsync(iconType, iconSlot, iconPngDataUri);
         } else {
@@ -580,7 +562,7 @@ class GameClient {
         }
     }
 
-    private async sendCurrentScreenAsync() {
+    public async sendCurrentScreenAsync() {
         if (this.screen) {
             const zippedData = await gzipAsync(this.screen);
             const buffer = Protocol.Binary.packCompressedScreenMessage(
@@ -721,6 +703,10 @@ export async function sendScreenUpdateAsync(
     palette: Uint8Array
 ) {
     await gameClient?.sendScreenUpdateAsync(img, palette);
+}
+
+export async function sendCurrentScreenAsync() {
+    await gameClient?.sendCurrentScreenAsync();
 }
 
 export function kickPlayer(clientId: string) {
