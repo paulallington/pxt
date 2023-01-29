@@ -505,20 +505,6 @@ export async function saveAsync(h: Header, text?: ScriptText, fromCloudSync?: bo
         allScripts.push(e)
     }
 
-    // const saveTimeExpired = () => {
-    //
-    //     if (U.nowSeconds() - h.modificationTime < pxt.appTarget.appTheme.secsBetweenSaves) {
-    //         return false
-    //     }
-    //
-    //     return true
-    // }
-    //
-    // if (!saveTimeExpired()) {
-    //     console.log(`Not saving due to save being less than ${pxt.appTarget.appTheme.secsBetweenSaves} seconds ago`);
-    //     return Promise.resolve()
-    // }
-
     const hasUserFileChanges = () => {
         console.log("User changes detected")
         // we see lots of frequent "saves" that don't come from real changes made by the user. This
