@@ -412,6 +412,8 @@ function ciAsync() {
         fs.writeFileSync(npmrc, cfg)
     }
 
+    process.env["PXT_ENV"] = "production";
+
     const latest = branch == "master" ? "latest" : "git-" + branch
     // upload locs on build on master
     const masterOrReleaseBranchRx = /^(master|v\d+\.\d+\.\d+)$/;
@@ -1788,7 +1790,7 @@ function saveThemeJson(cfg: pxt.TargetBundle, localDir?: boolean, packaged?: boo
     if (theme.title) targetStrings[theme.title] = theme.title;
     if (theme.name) targetStrings[theme.name] = theme.name;
     if (theme.description) targetStrings[theme.description] = theme.description;
-    if (theme.homeScreenHero && typeof theme.homeScreenHero != "string" ) {
+    if (theme.homeScreenHero && typeof theme.homeScreenHero != "string") {
         const heroBannerCard = theme.homeScreenHero;
         if (heroBannerCard.title) targetStrings[heroBannerCard.title] = heroBannerCard.title;
         if (heroBannerCard.description) targetStrings[heroBannerCard.description] = heroBannerCard.description;
@@ -1972,7 +1974,7 @@ async function buildSemanticUIAsync(parsed?: commandParser.ParsedCommand) {
 
     async function generateReactCommonCss(app: string) {
         const appFile = isPxtCore ? `react-common/styles/react-common-${app}-core.less` :
-        `node_modules/pxt-core/react-common/styles/react-common-${app}.less`;
+            `node_modules/pxt-core/react-common/styles/react-common-${app}.less`;
         await nodeutil.spawnAsync({
             cmd: "node",
             args: [
@@ -2022,7 +2024,7 @@ async function buildSemanticUIAsync(parsed?: commandParser.ParsedCommand) {
     for (const cssFile of files) {
         const css = await readFileAsync(`built/web/${cssFile}`, "utf8");
         const processed = await postcss([cssnano])
-                .process(css, { from: `built/web/${cssFile}`, to: `built/web/${cssFile}` });
+            .process(css, { from: `built/web/${cssFile}`, to: `built/web/${cssFile}` });
 
         await writeFileAsync(`built/web/${cssFile}`, processed.css);
 
@@ -2068,6 +2070,7 @@ function buildReactAppAsync(app: string, parsed: commandParser.ParsedCommand, op
     // this requires pxt serve to have completed before serving app, as it relies on
     // packing of pxtarget in buildTargetCoreAsync (mainly the chunk in the forEachBundledPkgAsync)
     expandedPxtTarget?: boolean,
+    includePdfLib?: boolean,
 }) {
     opts = opts || {
         copyAssets: true
@@ -2087,6 +2090,16 @@ function buildReactAppAsync(app: string, parsed: commandParser.ParsedCommand, op
             } else {
                 nodeutil.cp("built/target.js", `${appRoot}/public/blb`);
             }
+
+            // This will be missing when serving without a cloned / linked repo
+            if (opts.includePdfLib
+                && fs.existsSync("node_modules/pxt-core/webapp/public/pdf-lib/pdf-lib.min.js")) {
+                nodeutil.cp(
+                    "node_modules/pxt-core/webapp/public/pdf-lib/pdf-lib.min.js",
+                    `${appRoot}/public/blb/pdf-lib`
+                );
+            }
+
             nodeutil.cp("targetconfig.json", `${appRoot}/public/blb`);
             nodeutil.cp("node_modules/pxt-core/built/pxtlib.js", `${appRoot}/public/blb`);
             if (opts.includePxtSim) {
@@ -2119,7 +2132,14 @@ function buildReactAppAsync(app: string, parsed: commandParser.ParsedCommand, op
 }
 
 function buildSkillMapAsync(parsed: commandParser.ParsedCommand) {
-    return buildReactAppAsync("skillmap", parsed);
+    return buildReactAppAsync(
+        "skillmap",
+        parsed,
+        {
+            includePdfLib: true,
+            copyAssets: true
+        }
+    );
 }
 
 function buildAuthcodeAsync(parsed: commandParser.ParsedCommand) {
@@ -4581,10 +4601,11 @@ async function testSnippetsAsync(snippets: CodeSnippet[], re?: string, pyStrictS
 
 function setBuildEngine() {
     const cs = pxt.appTarget.compileService
-    if (cs && cs.buildEngine) {
-        build.setThisBuild(build.buildEngines[cs.buildEngine]);
+    if (cs) {
+        const engine = cs.buildEngine || "yotta"
+        build.setThisBuild(build.buildEngines[engine]);
         if (!build.thisBuild)
-            U.userError("cannot find build engine: " + cs.buildEngine)
+            U.userError("cannot find build engine: " + engine)
     }
 }
 

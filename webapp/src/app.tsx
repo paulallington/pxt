@@ -252,13 +252,22 @@ export class ProjectView
             else if (msg.type === "thumbnail") {
                 if (this.shareEditor) this.shareEditor.setThumbnailFrames((msg as pxsim.SimulatorAutomaticThumbnailMessage).frames);
             } else if (msg.type === "multiplayer") {
-                // todo move over types from multiplayer app to pxsim/embed.ts
-                const multiplayerMessage = msg as any;
+                const multiplayerMessage = msg as pxsim.multiplayer.Message;
                 if (multiplayerMessage.content === "Icon"
-                    && multiplayerMessage.iconType === 0 /** IconType.Player **/
+                    && multiplayerMessage.iconType === pxsim.multiplayer.IconType.Player
                 ) {
                     const { palette, icon, slot } = multiplayerMessage;
-                    this.handleSetPresenceIcon(slot, palette, icon.data);
+                    this.handleSetPresenceIcon(slot, palette, icon?.data);
+                }
+            } else if (msg.type === "toplevelcodefinished") {
+                if (pxt.appTarget?.appTheme?.multiplayer) {
+                    const playerOneConnectedMsg: pxsim.multiplayer.ConnectionMessage = {
+                        type: "multiplayer",
+                        content: "Connection",
+                        slot: 1,
+                        connected: true,
+                    };
+                    simulator.driver.postMessage(playerOneConnectedMsg);
                 }
             }
         }, false);
@@ -1562,8 +1571,8 @@ export class ProjectView
 
         if (this.shareEditor) {
             this.shareEditor.setThumbnailFrames(undefined);
-            this.setState({ isMultiplayerGame: false });
         }
+        this.setState({ isMultiplayerGame: false });
 
         const checkAsync = this.tryCheckTargetVersionAsync(h.targetVersion);
         if (checkAsync)
@@ -3171,13 +3180,11 @@ export class ProjectView
             try {
                 const resp = await compiler.compileAsync({ native: true, forceEmit: true });
                 this.editor.setDiagnostics(this.editorFile, state);
-                if (this.shareEditor) {
-                    if (resp.usedParts && resp.usedParts.indexOf("multiplayer") !== -1) {
-                        this.setState({ isMultiplayerGame: true });
-                    }
-                    else {
-                        this.setState({ isMultiplayerGame: false });
-                    }
+                if (resp.usedParts && resp.usedParts.indexOf("multiplayer") !== -1) {
+                    this.setState({ isMultiplayerGame: true });
+                }
+                else {
+                    this.setState({ isMultiplayerGame: false });
                 }
 
                 if (!saveOnly) {
@@ -3735,13 +3742,11 @@ export class ProjectView
                     this.clearSerial();
                     this.editor.setDiagnostics(this.editorFile, state)
 
-                    if (this.shareEditor) {
-                        if (resp.usedParts && resp.usedParts.indexOf("multiplayer") !== -1) {
-                            this.setState({ isMultiplayerGame: true });
-                        }
-                        else {
-                            this.setState({ isMultiplayerGame: false });
-                        }
+                    if (resp.usedParts && resp.usedParts.indexOf("multiplayer") !== -1) {
+                        this.setState({ isMultiplayerGame: true });
+                    }
+                    else {
+                        this.setState({ isMultiplayerGame: false });
                     }
 
                     if (resp.outfiles[pxtc.BINARY_JS]) {
@@ -3749,14 +3754,16 @@ export class ProjectView
                             pxt.debug(`sim: run`)
 
                             const hc = data.getData<boolean>(auth.HIGHCONTRAST)
-                            simulator.run(pkg.mainPkg, opts.debug, resp, {
-                                mute: this.state.mute,
-                                highContrast: hc,
-                                light: pxt.options.light,
-                                clickTrigger: opts.clickTrigger,
-                                storedState: pkg.mainEditorPkg().getSimState(),
-                                autoRun: this.state.autoRun
-                            }, opts.trace)
+                            if (!pxt.react.isFieldEditorViewVisible?.()) {
+                                simulator.run(pkg.mainPkg, opts.debug, resp, {
+                                    mute: this.state.mute,
+                                    highContrast: hc,
+                                    light: pxt.options.light,
+                                    clickTrigger: opts.clickTrigger,
+                                    storedState: pkg.mainEditorPkg().getSimState(),
+                                    autoRun: this.state.autoRun
+                                }, opts.trace)
+                            }
                             this.blocksEditor.setBreakpointsMap(resp.breakpoints, resp.procCallLocations);
                             this.textEditor.setBreakpointsMap(resp.breakpoints, resp.procCallLocations);
                             if (!cancellationToken.isCancelled()) {
@@ -4200,8 +4207,8 @@ export class ProjectView
         this.profileDialog.show(location);
     }
 
-    showShareDialog(title?: string, forMultiplayer?: boolean) {
-        this.shareEditor.show(title, forMultiplayer);
+    showShareDialog(title?: string, kind?: "multiplayer" | "vscode" | "share") {
+        this.shareEditor.show(title, kind);
     }
 
     showLanguagePicker() {

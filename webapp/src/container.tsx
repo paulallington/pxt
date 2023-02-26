@@ -468,10 +468,12 @@ interface IEditorSelectorProps extends ISettingsProps {
 export class EditorSelector extends data.Component<IEditorSelectorProps, {}> {
     private readonly disableBlocks: boolean;
     private readonly disableJavascript: boolean;
+    private readonly  disablePython: boolean;
     constructor(props: ISettingsProps) {
         super(props);
         this.disableBlocks = pxt.BrowserUtils.renderBlocksCheck();
         this.disableJavascript = pxt.BrowserUtils.renderJavaScriptCheck();
+        this.disablePython = pxt.BrowserUtils.renderPythonCheck();
     }
 
     renderCore() {
@@ -481,7 +483,7 @@ export class EditorSelector extends data.Component<IEditorSelectorProps, {}> {
         const pyOnly = languageRestriction === pxt.editor.LanguageRestriction.PythonOnly;
         const blocksOnly = languageRestriction === pxt.editor.LanguageRestriction.BlocksOnly;
         const noJavaScript = languageRestriction === pxt.editor.LanguageRestriction.NoJavaScript || this.disableJavascript;
-        const noPython = languageRestriction === pxt.editor.LanguageRestriction.NoPython;
+        const noPython = languageRestriction === pxt.editor.LanguageRestriction.NoPython || this.disablePython;
         const noBlocks = languageRestriction === pxt.editor.LanguageRestriction.NoBlocks || this.disableBlocks;
         const javaScript = pxt.appTarget.appTheme.javaScript;
 

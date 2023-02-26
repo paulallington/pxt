@@ -47,6 +47,16 @@ namespace pxt.BrowserUtils {
         return false;
     }
 
+    export function renderPythonCheck() {
+        console.log("Checking If Python should be available")
+        let urlQuery = Util.parseQueryString(window.location.href);
+        if (urlQuery["hidePython"]){
+            console.log("Python hidden from url arg");
+            return true;
+        }
+        return false;
+    }
+
     export function getProjectName() {
         let urlQuery = Util.parseQueryString(window.location.href);
         if (urlQuery["projectName"]){
