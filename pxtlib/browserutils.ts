@@ -57,6 +57,15 @@ namespace pxt.BrowserUtils {
         return false;
     }
 
+    export function SimulatorOnlyCheck() {
+        let urlQuery = Util.parseQueryString(window.location.href);
+        if (urlQuery["simulatorOnly"]){
+            console.log("Running Simulator Only");
+            return true;
+        }
+        return false;
+    }
+
     export function getProjectName() {
         let urlQuery = Util.parseQueryString(window.location.href);
         if (urlQuery["projectName"]){

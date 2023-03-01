@@ -1150,6 +1150,16 @@ export class ProjectView
             return undefined;
         }
 
+        const simulatorOnly = pxt.BrowserUtils.SimulatorOnlyCheck();
+
+        if (simulatorOnly){
+            this.openSimView();
+            document.getElementById("mainmenu").style.display = 'none';
+            document.getElementById("editortools").style.display = 'none';
+            document.getElementById("sandboxfooter").style.display = 'none';
+            document.getElementById("simtoolbar").style.marginTop = '2px';
+        }
+
         let simRunning = false;
         this.updatingEditorFile = true;
         return core.showLoadingAsync("updateeditorfile", lf("loading editor..."), Promise.resolve())

@@ -27,17 +27,6 @@
         })();
     }
 
-    let searchParams = new URLSearchParams(window.location.search);
-    const isSimulatorOnly = searchParams.has('simulator');
-
-    if (isSimulatorOnly) {
-        $(document).ready(function() {
-            setTimeout(function() {
-                $('.sim-menuitem').click();
-            }, 5000);
-        });
-    }
-
 	</script>
 
     <!-- @include appmeta.html -->
