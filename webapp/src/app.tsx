@@ -1157,7 +1157,7 @@ export class ProjectView
             document.getElementById("mainmenu").style.display = 'none';
             document.getElementById("editortools").style.display = 'none';
             document.getElementById("sandboxfooter").style.display = 'none';
-            document.getElementById("simtoolbar").style.marginTop = '2px';
+            document.getElementById("simtoolbar").style.display = 'none';
         }
 
         let simRunning = false;
