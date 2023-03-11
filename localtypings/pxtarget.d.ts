@@ -201,6 +201,7 @@ declare namespace pxt {
         showBadges?: boolean; // show badges in user profile
         githubPackages?: boolean; // allow searching github for packages
         noGithubProxy?: boolean;
+        showSharingButton?: boolean;
         maxFileSize?: number; // maximum file size in bytes
         warnFileSize?: number; // warn aboutfile size in bytes
         cloudProviders?: pxt.Map<AppCloudProvider>;

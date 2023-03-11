@@ -236,10 +236,6 @@ namespace pxt.Cloud {
 
     export function parseScriptId(uri: string): string {
         const target = pxt.appTarget;
-
-        // Override sharing
-        target.cloud.sharing = true;
-
         if (!uri || !target.appTheme || !target.cloud?.sharing) return undefined;
 
         let domains = ["makecode.com"];

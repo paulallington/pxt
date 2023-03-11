@@ -4,7 +4,7 @@ namespace pxt.multiplayer {
         STAGING,
         LOCAL
     }
-    let MULTIPLAYER_DEV_BACKEND_TYPE = MultiplayerDevBackendType.STAGING;
+    let MULTIPLAYER_DEV_BACKEND_TYPE = MultiplayerDevBackendType.PROD;
 
     export const ABSOLUTE_LINKS = {
         PROD_BETA: "https://arcade.makecode.com/beta--multiplayer",
@@ -71,10 +71,14 @@ namespace pxt.multiplayer {
     };
 
     export function makeHostLink(shareUrlOrCode: string, shortLink: boolean) {
-        return `${shortLink ? SHORT_LINK() : RELATIVE_LINK()}?host=${encodeURIComponent(shareUrlOrCode)}`;
+        console.log(shareUrlOrCode);
+        console.log(RELATIVE_LINK());
+        return `https://arcade.makecode.com/beta--multiplayer?host=${encodeURIComponent(shareUrlOrCode)}`;
+        // return `${shortLink ? SHORT_LINK() : RELATIVE_LINK()}?host=${encodeURIComponent(shareUrlOrCode)}`;
     }
 
     export function makeJoinLink(joinCode: string, shortLink: boolean) {
-        return `${shortLink ? SHORT_LINK() : RELATIVE_LINK()}?join=${encodeURIComponent(joinCode)}`;
+        return `https://arcade.makecode.com/beta--multiplayer?host=?join=${encodeURIComponent(joinCode)}`;
+        // return `${shortLink ? SHORT_LINK() : RELATIVE_LINK()}?join=${encodeURIComponent(joinCode)}`;
     }
 }
