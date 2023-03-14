@@ -5,7 +5,6 @@
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
     <meta name="viewport" content="width=device-width,height=device-height,user-scalable=no,initial-scale=1.0,maximum-scale=1.0,minimum-scale=1.0">
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
     <script type="text/javascript">
     if(/[&?]translate=1/.test(window.location.href)) {
 		var _jipt = [];
@@ -29,119 +28,48 @@
 
 	</script>
 
+    <script>
+        (function (w, t, c, p, s, e) {
+            p = new Promise(function (r) {
+                w[c] = {
+                    client: function () {
+                        if (!s) {
+                            s = document.createElement(t);
+                            s.src = 'https://js.cobrowse.io/CobrowseIO.js';
+                            s.async = 1;
+                            e = document.getElementsByTagName(t)[0];
+                            e.parentNode.insertBefore(s, e);
+                            s.onload = function () { r(w[c]); };
+                        }
+                        return p;
+                    }
+                };
+            });
+        })(window, 'script', 'CobrowseIO');
+
+        window.onload = function() {
+            if (typeof CobrowseIO !== 'undefined') {
+                console.log("cobrowse: ", CobrowseIO);
+                CobrowseIO.license = "lzO5A38V6P78ew";
+
+                CobrowseIO.trustedOrigins = [
+                    'https://online.thecodezone.co.uk'
+                ];
+
+                CobrowseIO.customData = {
+                    user_id: user_id,
+                    user_name: username,
+                    device_name: username
+                };
+
+                CobrowseIO.client().then(function () {
+                    CobrowseIO.start();
+                });
+            }
+        };
+    </script>
+
     <!-- @include appmeta.html -->
-
-    <style>
-        body{
-            font-family: Arial, Sans;
-            margin: 0;
-        }
-
-        .wrapper{
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 300px;
-            text-align:center;
-            transform: translateX(-50%);
-        }
-
-        .spanner{
-            position:absolute;
-            top: 50%;
-            left: 0;
-            background: #f48a20;
-            width: 100%;
-            display:block;
-            text-align:center;
-            height: 100%;
-            color: #FFF;
-            transform: translateY(-50%);
-            z-index: 100000;
-            visibility: hidden;
-        }
-
-        .overlay-loader{
-            position: fixed;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            visibility: hidden;
-        }
-
-        .loader-project,
-        .loader-project:before,
-        .loader-project:after {
-            border-radius: 50%;
-            width: 2.5em;
-            height: 2.5em;
-            -webkit-animation-fill-mode: both;
-            animation-fill-mode: both;
-            -webkit-animation: load7 1.8s infinite ease-in-out;
-            animation: load7 1.8s infinite ease-in-out;
-        }
-        .loader-project {
-            color: #ffffff;
-            font-size: 10px;
-            margin: 600px auto;
-            position: relative;
-            text-indent: -9999em;
-            -webkit-transform: translateZ(0);
-            -ms-transform: translateZ(0);
-            transform: translateZ(0);
-            -webkit-animation-delay: -0.16s;
-            animation-delay: -0.16s;
-        }
-        .loader-project:before,
-        .loader-project:after {
-            content: '';
-            position: absolute;
-            top: 0;
-        }
-        .loader-project:before {
-            left: -3.5em;
-            -webkit-animation-delay: -0.32s;
-            animation-delay: -0.32s;
-        }
-        .loader-project:after {
-            left: 3.5em;
-        }
-        @-webkit-keyframes load7 {
-            0%,
-            80%,
-            100% {
-                box-shadow: 0 2.5em 0 -1.3em;
-            }
-            40% {
-                box-shadow: 0 2.5em 0 0;
-            }
-        }
-        @keyframes load7 {
-            0%,
-            80%,
-            100% {
-                box-shadow: 0 2.5em 0 -1.3em;
-            }
-            40% {
-                box-shadow: 0 2.5em 0 0;
-            }
-        }
-
-        .show{
-            visibility: visible;
-        }
-
-        .spanner, .overlay-loader{
-            opacity: 0;
-            -webkit-transition: all 0.3s;
-            -moz-transition: all 0.3s;
-            transition: all 0.3s;
-        }
-
-        .spanner.show, .overlay-loader.show {
-            opacity: 1;
-        }
-    </style>
 
     <link rel="stylesheet" data-rtl="/blb/rtlsemantic.css" href="/blb/semantic.css" type="text/css">
 </head>
@@ -150,11 +78,6 @@
     <div class="makecodeeditor">
         <div id='loading' class="ui active dimmer">
             <div class="ui large main loader"></div>
-        </div>
-
-        <div class="overlay-loader"></div>
-        <div class="spanner">
-            <div class="loader-project"></div>
         </div>
 
         <div id='custom-content'>
@@ -182,6 +105,7 @@
         </script>
         <!-- @include apptrackingweb.html -->
         <!-- @include apptracking.html -->
+<!--        <script type="text/javascript" src="/blb/makecodebundle.min.js.js"></script>-->
         <script type="text/javascript" src="/blb/pxtapp.js"></script>
         <script type="text/javascript" src="/blb/target.js"></script>
         <script id="mainscript" type="text/javascript" src="/blb/main.js"></script>
