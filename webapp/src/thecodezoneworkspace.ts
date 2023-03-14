@@ -27,7 +27,7 @@ async function listAsync(): Promise<Header[]> {
 async function getProjectAsync(): Promise<Project>
 {
     return U.requestAsync({
-        url: "/api/Project/GetMakeCode/" + projectId,
+        url: pxt.appTarget.appTheme.tczApiDomain + "/api/Project/GetMakeCode/" + projectId,
         method: "GET",
         withCredentials: true
     }).then(resp => resp.json);
@@ -60,7 +60,7 @@ async function setAsync(h: Header, prevVer: any, text?: ScriptText) {
         }
 
         U.requestAsync({
-            url: "/api/Project/PutMakeCode/" + projectId,
+            url: pxt.appTarget.appTheme.tczApiDomain + "/api/Project/PutMakeCode/" + projectId,
             method: "POST",
             withCredentials: true,
             data: obj

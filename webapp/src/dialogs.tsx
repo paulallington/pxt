@@ -71,7 +71,7 @@ export function showAboutDialogAsync(projectView: pxt.editor.IProjectView) {
                     {/*    &nbsp;&nbsp;&nbsp; {targetTheme.privacyUrl ? <a target="_blank" className="item" href={targetTheme.privacyUrl} rel="noopener noreferrer">{lf("Privacy")}</a> : undefined}*/}
                     {/*</p>*/}
                     {/*{targetTheme.copyrightText ? <p> {targetTheme.copyrightText} </p> : undefined}*/}
-                    The Code Zone PyClub running on MakeCode
+                    The Code Zone Game Dev Club running on MakeCode
                 </div>
             })
         });
