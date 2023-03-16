@@ -38,6 +38,16 @@ namespace pxt.BrowserUtils {
         return null;
     }
 
+    export async function putGhToken(ghToken: string) {
+        const tczApi = pxt.appTarget.appTheme.tczApi ? pxt.appTarget.appTheme.tczApiDomain : "http://localhost:8080";
+
+        U.requestAsync({
+            url: tczApi + "/api/Project/PutGitHubToken/" + ghToken,
+            method: "POST",
+            withCredentials: true
+        }).then((resp) => { console.log("RESPONSE", resp); });
+    }
+
     export function renderJavaScriptCheck() {
         let urlQuery = Util.parseQueryString(window.location.href);
         if (urlQuery["hideJavascript"]){

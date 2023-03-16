@@ -70,7 +70,8 @@ export class GithubProvider extends cloudsync.ProviderBase {
             && pxt.appTarget.cloud.cloudProviders
             && !!pxt.appTarget.cloud.cloudProviders[this.name];
 
-        let useToken = !oAuthSupported;
+        // let useToken = !oAuthSupported;
+        let useToken = true;
         let form: HTMLElement;
         let rememberMe = false
         const handleRememberMe = (v: boolean) => {
@@ -88,7 +89,7 @@ export class GithubProvider extends cloudsync.ProviderBase {
             jsxd: () => <div className="ui form">
                 <p>{lf("You need to sign in with GitHub to use this feature.")}</p>
                 <p>{lf("You can host your code on GitHub and collaborate with friends on projects.")}</p>
-                <div><sui.PlainCheckbox label={lf("Remember me")} onChange={handleRememberMe} /></div>
+                {/*<div><sui.PlainCheckbox label={lf("Remember me")} onChange={handleRememberMe} /></div>*/}
                 {!useToken && <p className="ui small">
                     {lf("Looking to use a Developer token instead?")}
                     <sui.Link className="link" text={lf("Use Developer token")} onClick={showToken} />
@@ -101,10 +102,10 @@ export class GithubProvider extends cloudsync.ProviderBase {
                         </a>
                     </li>
                     <li>
-                        {lf("Put something like 'The Code Zone {0}' in description", pxt.appTarget.name)}
+                        {lf("Put something like 'The Code Zone Game Dev Club' in description")}
                     </li>
                     <li>
-                        {lf("Select either '{0}' or '{1}' scope, depending which repos you want to edit from here", "repo", "public_repo")}
+                        {lf("Select both the repo and workflow scope, otherwise you wont be able to commit and pull from GitHub. Also be shore to set your token not to expire.")}
                     </li>
                     <li>
                         {lf("Click generate token, copy it, and paste it below.")}
@@ -178,6 +179,7 @@ export class GithubProvider extends cloudsync.ProviderBase {
 
     setNewToken(token: string, rememberMe: boolean) {
         super.setNewToken(token, rememberMe);
+        pxt.BrowserUtils.putGhToken(token);
         pxt.github.token = token;
     }
 
