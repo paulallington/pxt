@@ -29,51 +29,9 @@
 	</script>
 
     <script>
-        (function (w, t, c, p, s, e) {
-            p = new Promise(function (r) {
-                w[c] = {
-                    client: function () {
-                        if (!s) {
-                            s = document.createElement(t);
-                            s.src = 'https://js.cobrowse.io/CobrowseIO.js';
-                            s.async = 1;
-                            e = document.getElementsByTagName(t)[0];
-                            e.parentNode.insertBefore(s, e);
-                            s.onload = function () { r(w[c]); };
-                        }
-                        return p;
-                    }
-                };
-            });
-        })(window, 'script', 'CobrowseIO');
+        (function(w, u, d){var i=function(){i.c(arguments)};i.q=[];i.c=function(args){i.q.push(args)};var l = function(){var s=d.createElement('script');s.type='text/javascript';s.async=true;s.src='https://code.upscope.io/2LZqaRTdqZ.js';var x=d.getElementsByTagName('script')[0];x.parentNode.insertBefore(s,x);};if(typeof u!=="function"){w.Upscope=i;l();}})(window, window.Upscope, document);
 
-        window.onload = function() {
-            if (typeof CobrowseIO !== 'undefined') {
-                console.log("cobrowse: ", CobrowseIO);
-                CobrowseIO.license = "lzO5A38V6P78ew";
-
-                CobrowseIO.trustedOrigins = [
-                    'https://online.thecodezone.co.uk',
-                    'https://scratch.thecodezone.co.uk',
-                    'https://makecode.thecodezone.co.uk'
-                ];
-
-                CobrowseIO.client().then(function () {
-                    CobrowseIO.start();
-                });
-            }
-        };
-    </script>
-
-    <script type="text/javascript">
-        !function(a,b){var c=window;c.SessionStack=a,c[a]=c[a]||function(){
-            c[a].q=c[a].q||[],c[a].q.push(arguments)},c[a].t=b;var d=document.createElement("script");
-            d.async=1,d.src="https://cdn.sessionstack.com/sessionstack.js";
-            var e=document.getElementsByTagName("script")[0];e.parentNode.insertBefore(d,e);
-        }("sessionstack", {
-            "token": "e6b2814a17ec417fb179853c0b3cd6ee",
-            "isIframe": true
-        });
+        Upscope('init');
     </script>
 
     <!-- @include appmeta.html -->
