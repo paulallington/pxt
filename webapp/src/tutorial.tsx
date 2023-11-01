@@ -14,7 +14,6 @@ import { PlayButton } from "./simtoolbar";
 import { ProjectView } from "./app";
 import * as editortoolbar from "./editortoolbar";
 import * as ImmersiveReader from "./immersivereader";
-import * as TutorialCodeValidation from "./tutorialCodeValidation";
 import { fireClickOnEnter } from "./util";
 
 type ISettingsProps = pxt.editor.ISettingsProps;
@@ -23,6 +22,7 @@ interface ITutorialBlocks {
     snippetBlocks: pxt.Map<pxt.Map<number>>;
     usedBlocks: pxt.Map<number>;
     highlightBlocks: pxt.Map<pxt.Map<number>>;
+    validateBlocks: pxt.Map<pxt.Map<string[]>>;
 }
 
 /**
@@ -48,7 +48,7 @@ export function getUsedBlocksAsync(code: string[], id: string, language?: string
                     pxt.tickEvent(`tutorial.usedblocks.indexeddb`, { tutorial: id });
                     // populate snippets if usedBlocks are present, but snippets are not
                     if (!entry?.snippets) getUsedBlocksInternalAsync(code, id, language, db, skipCache);
-                    return Promise.resolve({ snippetBlocks: entry.snippets, usedBlocks: entry.blocks, highlightBlocks: entry.highlightBlocks });
+                    return Promise.resolve({ snippetBlocks: entry.snippets, usedBlocks: entry.blocks, highlightBlocks: entry.highlightBlocks, validateBlocks: entry.validateBlocks });
                 } else {
                     return getUsedBlocksInternalAsync(code, id, language, db, skipCache);
                 }
@@ -67,6 +67,7 @@ function getUsedBlocksInternalAsync(code: string[], id: string, language?: strin
     const snippetBlocks: pxt.Map<pxt.Map<number>> = {};
     const usedBlocks: pxt.Map<number> = {};
     const highlightBlocks: pxt.Map<pxt.Map<number>> = {};
+    const validateBlocks: pxt.Map<pxt.Map<string[]>> = {};
     return compiler.getBlocksAsync()
         .then(blocksInfo => {
             pxt.blocks.initializeAndInject(blocksInfo);
@@ -89,6 +90,7 @@ function getUsedBlocksInternalAsync(code: string[], id: string, language?: strin
                     const allblocks = headless.getAllBlocks(false);
                     snippetBlocks[snippetHash] = {};
                     highlightBlocks[snippetHash] = {};
+                    validateBlocks[snippetHash] = {};
                     for (let bi = 0; bi < allblocks.length; ++bi) {
                         const blk = allblocks[bi];
                         if (blk.type == "typescript_statement") {
@@ -101,12 +103,20 @@ function getUsedBlocksInternalAsync(code: string[], id: string, language?: strin
                             usedBlocks[blk.type] = 1;
                         }
 
-                        const comment = blk.getCommentText();
+                        let comment = blk.getCommentText();
                         if (comment && /@highlight/.test(comment)) {
                             if (!highlightBlocks[snippetHash][blk.type]) {
                                 highlightBlocks[snippetHash][blk.type] = 0;
                             }
                             highlightBlocks[snippetHash][blk.type] = highlightBlocks[snippetHash][blk.type] + 1;
+                        }
+                        while (comment && /@\S+/.test(comment)) {
+                            const marker = comment.match(/@(\S+)/)[1];
+                            comment = comment.replace(/@\S+/, "");
+                            if (!validateBlocks[snippetHash][marker]) {
+                                validateBlocks[snippetHash][marker] = [];
+                            }
+                            validateBlocks[snippetHash][marker].push(blk.type);
                         }
                     }
                 }
@@ -118,7 +128,7 @@ function getUsedBlocksInternalAsync(code: string[], id: string, language?: strin
                 }
 
                 try {
-                    if (db && !skipCache) db.setAsync(id, snippetBlocks, code, highlightBlocks);
+                    if (db && !skipCache) db.setAsync(id, snippetBlocks, code, highlightBlocks, validateBlocks);
                 }
                 catch (e) {
                     // Don't fail if the indexeddb fails, but log it
@@ -129,7 +139,7 @@ function getUsedBlocksInternalAsync(code: string[], id: string, language?: strin
                 throw new Error("Failed to decompile");
             }
 
-            return { snippetBlocks, usedBlocks, highlightBlocks };
+            return { snippetBlocks, usedBlocks, highlightBlocks, validateBlocks };
         }).catch((e) => {
             pxt.reportException(e);
             throw new Error(`Failed to decompile tutorial`);
@@ -380,7 +390,6 @@ export class TutorialHint extends data.Component<ISettingsProps, TutorialHintSta
 interface TutorialCardState {
     showHint?: boolean;
     showSeeMore?: boolean;
-    showTutorialValidationMessage?: boolean;
 }
 
 interface TutorialCardProps extends ISettingsProps {
@@ -402,7 +411,6 @@ export class TutorialCard extends data.Component<TutorialCardProps, TutorialCard
         this.state = {
             showSeeMore: false,
             showHint: options.tutorialStepInfo[this.prevStep].showHint,
-            showTutorialValidationMessage: false
         }
 
         this.toggleHint = this.toggleHint.bind(this);
@@ -417,10 +425,6 @@ export class TutorialCard extends data.Component<TutorialCardProps, TutorialCard
         this.toggleExpanded = this.toggleExpanded.bind(this);
         this.onMarkdownDidRender = this.onMarkdownDidRender.bind(this);
         this.handleResize = this.handleResize.bind(this);
-        this.showTutorialValidationMessageOnClick = this.showTutorialValidationMessageOnClick.bind(this);
-        this.closeTutorialValidationMessage = this.closeTutorialValidationMessage.bind(this);
-        this.doubleClickedNextStep = this.doubleClickedNextStep.bind(this);
-        this.validationTelemetry = this.validationTelemetry.bind(this);
     }
 
     previousTutorialStep() {
@@ -433,7 +437,6 @@ export class TutorialCard extends data.Component<TutorialCardProps, TutorialCard
 
         pxt.tickEvent(`tutorial.previous`, { tutorial: options.tutorial, step: previousStep }, { interactiveConsent: true });
         this.props.parent.setTutorialStep(previousStep);
-        this.setState({ showTutorialValidationMessage: false });
     }
 
     nextTutorialStep() {
@@ -446,16 +449,6 @@ export class TutorialCard extends data.Component<TutorialCardProps, TutorialCard
 
         pxt.tickEvent(`tutorial.next`, { tutorial: options.tutorial, step: nextStep }, { interactiveConsent: true });
         this.props.parent.setTutorialStep(nextStep);
-
-        const tutorialCodeValidationIsOn = options.metadata.tutorialCodeValidation;
-        if (tutorialCodeValidationIsOn && this.state.showTutorialValidationMessage) { // disables tutorial validation pop-up if next buttion is clicked
-            this.setState({ showTutorialValidationMessage: false });
-        }
-    }
-
-    doubleClickedNextStep() {
-        this.validationTelemetry('next');
-        this.nextTutorialStep();
     }
 
     finishTutorial() {
@@ -592,10 +585,6 @@ export class TutorialCard extends data.Component<TutorialCardProps, TutorialCard
         }
     }
 
-    private showTutorialValidationMessageOnClick(evt?: any) {
-        this.setState({ showTutorialValidationMessage: true });
-    }
-
     private expandedHintOnClick(evt?: any) {
         evt.stopPropagation();
     }
@@ -656,50 +645,7 @@ export class TutorialCard extends data.Component<TutorialCardProps, TutorialCard
             this.props.parent.setHintSeen(currentStep);
         }
         th.showHint(visible, showFullText);
-        if (visible) {
-            this.setState({ showTutorialValidationMessage: false });
-        }
     }
-
-    closeTutorialValidationMessage() {
-        this.setState({ showTutorialValidationMessage: false });
-    }
-
-    isCodeValidated(rules: pxt.tutorial.TutorialRuleStatus[]) {
-        if (rules != undefined) {
-            for (let i = 0; i < rules.length; i++) {
-                if (rules[i].ruleTurnOn && !rules[i].ruleStatus) {
-                    return false;
-                }
-            }
-            return true;
-        }
-        return false;
-    }
-
-    areStrictRulesPresent(rules: pxt.tutorial.TutorialRuleStatus[]) {
-        return rules?.some(rule => rule.ruleTurnOn && rule.isStrict) ?? false;
-    }
-
-    validationTelemetry(command: string) {
-        const { tutorialName, tutorialStepInfo, tutorialStep } = this.props.parent.state.tutorialOptions;
-        const stepInfo = tutorialStepInfo[tutorialStep];
-        const rules = stepInfo.listOfValidationRules;
-        if (rules != undefined) {
-            const validationRuleStepStatus: pxt.Map<string | number> = {
-                tutorial: tutorialName,
-                step: tutorialStep
-            };
-            for (let i = 0; i < rules.length; i++) {
-                if (rules[i].ruleTurnOn) {
-                    validationRuleStepStatus["ruleName"] = rules[i].ruleName;
-                    let str = 'tutorial.validation.' + (command) + (rules[i].ruleStatus ? '.pass' : '.fail');
-                    pxt.tickEvent(str, validationRuleStepStatus);
-                }
-            }
-        }
-    }
-
 
     renderCore() {
         const options = this.props.parent.state.tutorialOptions;
@@ -717,12 +663,6 @@ export class TutorialCard extends data.Component<TutorialCardProps, TutorialCard
         const hasHint = this.hasHint();
         const tutorialCardContent = stepInfo.headerContentMd;
         const showDialog = stepInfo.showDialog;
-        const validationEnabled = (stepInfo.listOfValidationRules != undefined);
-        const tutorialCodeValidated = this.isCodeValidated(stepInfo.listOfValidationRules);
-        const showTutorialValidationMessage = this.state.showTutorialValidationMessage && validationEnabled;
-        const strictRulePresent = this.areStrictRulesPresent(stepInfo.listOfValidationRules);
-        const nextOnClick = (!validationEnabled || !strictRulePresent || (tutorialCodeValidated && strictRulePresent)) ? this.nextTutorialStep :
-            (this.state.showTutorialValidationMessage) ? this.doubleClickedNextStep : this.showTutorialValidationMessageOnClick;
 
         const tutorialAriaLabel = lf("Press Space or Enter to show a hint.");
         const tutorialHintTooltip = lf("Click to show a hint!");
@@ -758,10 +698,8 @@ export class TutorialCard extends data.Component<TutorialCardProps, TutorialCard
                     {this.state.showSeeMore && !tutorialStepExpanded && <sui.Button className="fluid compact lightgrey" icon="chevron down" tabIndex={0} text={lf("More...")} onClick={this.toggleExpanded} onKeyDown={fireClickOnEnter} />}
                     {this.state.showSeeMore && tutorialStepExpanded && <sui.Button className="fluid compact lightgrey" icon="chevron up" tabIndex={0} text={lf("Less...")} onClick={this.toggleExpanded} onKeyDown={fireClickOnEnter} />}
                 </div>
-                {hasNext ? <sui.Button icon={`${isRtl ? 'left' : 'right'} chevron large`} className={`nextbutton right attached ${!hasNext ? 'disabled' : ''}  ${tutorialCodeValidated ? 'isValidated' : ''}`} text={lf("Next")} textClass="widedesktop only" ariaLabel={lf("Go to the next step of the tutorial.")}
-                    onClick={nextOnClick} onKeyDown={fireClickOnEnter} /> : undefined}
-                {showTutorialValidationMessage &&
-                    <TutorialCodeValidation.ShowValidationMessage onYesButtonClick={this.nextTutorialStep} onNoButtonClick={this.closeTutorialValidationMessage} initialVisible={this.state.showTutorialValidationMessage} isTutorialCodeInvalid={!tutorialCodeValidated} ruleComponents={stepInfo.listOfValidationRules} areStrictRulesPresent={strictRulePresent} validationTelemetry={this.validationTelemetry} parent={this.props.parent} />}
+                {hasNext ? <sui.Button icon={`${isRtl ? 'left' : 'right'} chevron large`} className={`nextbutton right attached ${!hasNext ? 'disabled' : ''}`} text={lf("Next")} textClass="widedesktop only" ariaLabel={lf("Go to the next step of the tutorial.")}
+                    onClick={this.nextTutorialStep} onKeyDown={fireClickOnEnter} /> : undefined}
                 {hasFinish ? <sui.Button icon="left checkmark" className={`orange right attached ${!tutorialReady ? 'disabled' : ''}`} text={lf("Finish")} ariaLabel={lf("Finish the tutorial.")} onClick={this.finishTutorial} onKeyDown={fireClickOnEnter} /> : undefined}
             </div>
         </div>;

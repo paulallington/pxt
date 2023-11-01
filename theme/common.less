@@ -55,18 +55,18 @@ pre {
     position: relative;
 }
 
-#editorSidebar,
+#simulator .editor-sidebar,
 #maineditor,
 #sidedocs {
   position: absolute;
   bottom: 0rem;
 }
 
-#editorSidebar, #maineditor, #sidedocs {
+#simulator .editor-sidebar, #maineditor, #sidedocs {
     top: @mainMenuHeight;
 }
 
-.hideMenuBar:not(.headless) #editorSidebar,
+.hideMenuBar:not(.headless) #simulator .editor-sidebar,
     .hideMenuBar #maineditor,
     .hideMenuBar #sidedocs {
     top: 0 !important;
@@ -159,7 +159,7 @@ pre {
     border: unset;
 }
 
-#blocksArea, #monacoEditor, #pxtJsonEditor, #serialEditor, #assetEditor, #editorSidebar {
+#blocksArea, #monacoEditor, #pxtJsonEditor, #serialEditor, #assetEditor, #simulator .editor-sidebar {
     bottom: @editorToolsCollapsedHeight;
 }
 
@@ -169,7 +169,7 @@ pre {
 .hideEditorToolbar #serialEditor,
 .hideEditorToolbar #githubEditor,
 .hideEditorToolbar #assetEditor,
-.hideEditorToolbar #editorSidebar {
+.hideEditorToolbar #simulator .editor-sidebar {
     bottom: 0rem !important;
 }
 
@@ -187,17 +187,18 @@ pre {
 #simulator {
     height: 100%;
 }
-#editorSidebar, #downloadArea {
+#simulator .editor-sidebar, #downloadArea {
     min-width: @simulatorWidth;
     max-width: @simulatorWidth;
     left: 0;
 }
 
-#editorSidebar {
-    overflow: hidden;
+#simulator .editor-sidebar {
+    overflow-x: hidden;
+    overflow-y: auto;
     margin-top: 0;
     margin-bottom: 0;
-    width: 100%;
+    right: 0;
     background-color: @filelistBackgroundColor;
     z-index: @filelistZIndex;
 }
@@ -213,7 +214,7 @@ pre {
 }
 
 
-#editorSidebar .simtoolbar {
+#simulator .editor-sidebar .simtoolbar {
     -webkit-transition: opacity 0.2s; /* Safari */
     -moz-transition: opacity 0.2s; /* Mozilla */
     -webkit-transition-timing-function: linear; /* Mozilla */
@@ -235,7 +236,7 @@ pre {
     margin-left: auto;
 }
 
-#editortools .download-button.icon-and-text {
+#editortools .download-button {
     text-align: center;
 }
 
@@ -243,9 +244,9 @@ pre {
     background-color: transparent !important;
 }
 
-#editorSidebar .filemenu {
+#simulator .editor-sidebar .filemenu {
     direction: ltr;
-    width: 100%;
+    width: 100% !important;
     margin: 0;
     margin-top: 1rem;
 }
@@ -673,7 +674,7 @@ div.simframe > iframe {
     z-index: 1000;
 }
 
-.notificationBannerVisible #editorSidebar,
+.notificationBannerVisible #simulator .editor-sidebar,
 .notificationBannerVisible #maineditor,
 .notificationBannerVisible #sidedocs {
     top: calc(@mainMenuHeight + @bannerHeight);
@@ -1209,7 +1210,7 @@ Field editors
 @sidebarSecondaryColor: @blue;
 @sidbarActiveTabIconColor: @sidebarSecondaryColor;
 
-#editorSidebar {
+#simulator .editor-sidebar {
     border-right: 2px solid darken(desaturate(@blocklyToolboxColor, 60%), 10%);
 
     .tab-navigation {
@@ -1310,7 +1311,7 @@ p.ui.font.small {
         display:none !important; // hide desktop simulator toggle
     }
 
-    .hideEditorToolbar #editorSidebar {
+    .hideEditorToolbar #simulator .editor-sidebar {
         display:none !important;
     }
 
@@ -1415,6 +1416,9 @@ p.ui.font.small {
         display: none !important;
         z-index: -10 !important;
     }
+    #tutorialWrapper {
+        display: none;
+    }
     .sandboxfooter {
         z-index: @sandboxFooterZIndex;
         bottom: 1rem;
@@ -1467,6 +1471,10 @@ p.ui.font.small {
     }
 }
 
+.sandbox .simPanel .simtoolbar {
+    display: none !important;
+}
+
 /***********************************
    Headless Simtoolbar (Minecraft)
 ************************************/
@@ -1493,18 +1501,8 @@ p.ui.font.small {
 }
 
 #root.headless.collapsedEditorTools {
-    #editorSidebar {
-        position: absolute;
-        width: auto;
-        top: auto;
-        left: 5rem;
-        background: none transparent;
-        min-width: inherit;
-        max-width: inherit;
-
-        .tab-simulator {
-            display: none;
-        }
+    #simulator .editor-sidebar {
+        display: none;
     }
 
     #boardview, .filemenu {
@@ -1513,7 +1511,7 @@ p.ui.font.small {
 }
 
 #root.headless:not(.collapsedEditorTools) {
-    #editorSidebar {
+    #simulator .editor-sidebar {
         left: 0;
         z-index: 40;
     }
@@ -1572,9 +1570,14 @@ p.ui.font.small {
         Download dialogs
 *******************************/
 
-.ui.modal .actions .dialog-help-large {
+.ui.modal .actions .dialog-help-large,
+.downloaddialog.ui.modal .actions .icon.help {
     float: left;
     margin-left: 4px;
+}
+
+.downloaddialog.ui.modal .actions .icon-and-text.icon~.ui.text {
+    margin-left: -0.5em !important;
 }
 
 .ui.modal .actions .left-action {
@@ -1589,15 +1592,19 @@ p.ui.font.small {
     position: relative;
     margin-top: 1.5rem;
 
-    .ui.purple.ribbon.large.label {
+    .ui.purple.ribbon.label {
         position: absolute;
-        left: -1.2rem;
+        left: -1rem;
         top: -1rem;
+        padding-left: 1.5rem;
     }
 
-    a {
-        color: #4C309D;
-        cursor: pointer;
+    > .content {
+        padding-top: .25rem;
+    }
+
+    a.ui.button {
+        margin-top: .5rem;
     }
 }
 
@@ -1618,7 +1625,12 @@ p.ui.font.small {
     display: inline;
 }
 
-.download-dialog-image img {
+.downloaddialog .content .webusb-connect-image {
+    padding: 0 !important;
+    margin: 0 auto;
+}
+
+.download-dialog-image img:not(.large) {
     max-height: 200px;
     object-fit: contain;
 }
@@ -1628,6 +1640,10 @@ p.ui.font.small {
     display: flex;
     height: 100%;
     align-items: center;
+}
+
+.downloaddialog .actions .approve.secondary {
+    float: left;
 }
 
 #downloadArea button .icon.xicon {
@@ -1671,7 +1687,7 @@ p.ui.font.small {
            Mini sim view
 *******************************/
 
-#root.miniSim:not(.fullscreensim) {
+#root.miniSim:not(.fullscreensim):not(.sandbox) {
     /* Layout */
     .simPanel.ui.items {
         position: fixed;
@@ -1694,12 +1710,12 @@ p.ui.font.small {
             display: block !important;
         }
     }
-    .collapsedEditorTools:not(.tabTutorial) .simPanel {
+    &.collapsedEditorTools:not(.tabTutorial) .simPanel {
         > div {
             display: none !important;
         }
     }
-    .collapsedEditorTools .simPanel {
+    &.collapsedEditorTools .simPanel {
         aside.simtoolbar button:not(.expand-button) {
             display: none !important;
         }
@@ -1876,7 +1892,7 @@ p.ui.font.small {
 
 /* >= Small Monitor (Small Monitor + Large Monitor + Wide Monitor) */
 @media only screen and (min-width: @computerBreakpoint) {
-    .collapsedEditorTools:not(.headless):not(.tabTutorial) #editorSidebar {
+    .collapsedEditorTools:not(.headless):not(.tabTutorial) #simulator .editor-sidebar {
         min-width: 21px;
         width: 21px;
         padding: 0;
@@ -1906,14 +1922,27 @@ p.ui.font.small {
         top: 4px;
         position: relative;
     }
+
+    #simulator .topInstructions {
+        left: @simulatorWidth;
+        min-width: unset;
+        max-width: unset;
+        padding: 0;
+    }
 }
 
 /* <= Small Monitor (Mobile + Tablet + Small Monitor) */
 @media only screen and (max-width: @largestSmallMonitor) {
     /* Layout */
-    #editorSidebar, #downloadArea {
+    #simulator .editor-sidebar, #downloadArea {
         min-width:@simulatorWidthSmall;
         max-width:@simulatorWidthSmall;
+    }
+
+    #simulator .topInstructions {
+        left: @simulatorWidthSmall;
+        min-width: unset;
+        max-width: unset;
     }
 
     #boardview.headless-sim {
@@ -1981,7 +2010,7 @@ p.ui.font.small {
         }
     }
 
-    #editorSidebar {
+    #simulator .editor-sidebar {
         min-width: unset;
         max-width: unset;
         width: 0;
@@ -2070,11 +2099,11 @@ p.ui.font.small {
         display: inline-block!important;
     }
 
-    #root.miniSim:not(.fullscreensim) {
+    #root.miniSim:not(.fullscreensim):not(.sandbox) {
         div.simframe {
             margin-bottom: -0.4rem
         }
-        
+
         &:not(.headless):not(.sandbox) {
             .simPanel .simtoolbar {
                 margin-bottom: -0.2rem;
@@ -2136,6 +2165,7 @@ p.ui.font.small {
     .fullscreensim .simtoolbar .ui.button {
         font-size: 1rem;
     }
+
     .collapsedEditorTools #mobiletogglesim {
         bottom: @editorToolsCollapsedMobileHeight;
     }
@@ -2167,7 +2197,7 @@ p.ui.font.small {
     #maineditor {
         top: @thinMenuHeight;
     }
-    #editorSidebar {
+    #simulator .editor-sidebar {
         top: @thinMenuHeight;
     }
 }
@@ -2303,15 +2333,17 @@ div.simframe.ui.embed {
     -ms-interpolation-mode: nearest-neighbor;
 }
 
-.ui.menu .logged-in-dropdown {
-    justify-content: center;
+.ui.menu .item.logged-in-dropdown {
+    padding-right: .25rem;
+    width: auto !important; // override .menu @largestMobileScreen breakpoint in menu.overrides
 }
 
 .ui.menu .item.sign-in-dropdown {
-    padding-right: .2rem;
+    padding-right: .25rem;
+    width: auto !important; // override .menu @largestMobileScreen breakpoint in menu.overrides
 }
 
-div.signin-button {
+.ui.menu .signin-button {
     display: flex;
     align-items: center;
     background-color: @homeScreenBackground;
@@ -2321,6 +2353,10 @@ div.signin-button {
     padding: 0 .6rem;
     font-family: @segoeUIFont;
     font-weight: 500;
+
+    .icon {
+        margin: 0 !important; // override .menu @largestMobileScreen breakpoint in menu.overrides
+    }
 
     .text {
         margin-right: .5rem;
@@ -2352,16 +2388,16 @@ button.ui.button.hostmultiplayergame-button {
     --multiplayer-presence-icon-4: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='25' height='29' fill='%234DA64D'%3E%3Cpath d='M12.754 14.686a7 7 0 100-14 7 7 0 000 14zm-8.5 2a3.5 3.5 0 00-3.5 3.5v.5c0 2.393 1.523 4.417 3.685 5.793 2.174 1.384 5.117 2.207 8.315 2.207 3.199 0 6.141-.823 8.315-2.206 2.163-1.377 3.685-3.4 3.685-5.794v-.5a3.5 3.5 0 00-3.5-3.5h-17z'/%3E%3C/svg%3E");
 }
 
-#root:not(.fullscreensim) .multiplayer-presence {
+#root:not(.fullscreensim):not(.sandbox) .multiplayer-presence {
     margin: 0;
     margin-bottom: -.5rem;
 }
 
-.miniSim:not(.fullscreensim):not(.tabTutorial) .multiplayer-presence {
+.miniSim:not(.fullscreensim):not(.sandbox):not(.tabTutorial) .multiplayer-presence {
     display: none;
 }
 
-#root.tabTutorial:not(.fullscreensim):not(.collapsedEditorTools) .tab-content.tab-simulator.hidden .simPanel > .multiplayer-presence {
+#root.tabTutorial:not(.fullscreensim):not(.collapsedEditorTools) .simulator-container.hidden .simPanel > .multiplayer-presence {
     display: block;
     position: fixed;
     bottom: 7rem;
@@ -2634,4 +2670,19 @@ select.ui.dropdown {
 
 .palette-picker-label {
     margin-right: 0.5rem;
+}
+
+// main loader progress bar
+.ui.loader.large.main .common-progressbar-wrapper {
+    margin-top: 1em;
+    width: ~"min(25rem, 50vw)";
+    height: 1em;
+
+    --progress-bar-filled-color: @white;
+    --progress-bar-unfilled-color: transparency;
+    --progress-bar-border-color: @white;
+
+    progress[value].common-progressbar {
+        border-radius: 1px;
+    }
 }

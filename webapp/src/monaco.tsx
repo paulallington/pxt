@@ -1475,8 +1475,7 @@ export class Editor extends toolboxeditor.ToolboxEditor {
             }).finally(() => {
                 editorRightArea.removeChild(loading);
                 // Do Not Remove: This is used by the skillmap
-                if (this.parent.isTutorial()) this.parent.onTutorialLoaded();
-
+                this.parent.onEditorContentLoaded();
             });
     }
 

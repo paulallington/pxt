@@ -28,6 +28,7 @@ type ISettingsProps = pxt.editor.ISettingsProps;
 // lf("Reference")
 // lf("Support")
 // lf("Hardware")
+// lf("Tour")
 
 function openTutorial(parent: pxt.editor.IProjectView, path: string) {
     pxt.tickEvent(`docs`, { path }, { interactiveConsent: true });
@@ -40,6 +41,11 @@ function openTutorial(parent: pxt.editor.IProjectView, path: string) {
 function openDocs(parent: pxt.editor.IProjectView, path: string) {
     pxt.tickEvent(`docs`, { path }, { interactiveConsent: true });
     parent.setSideDoc(path);
+}
+
+function startTour(parent: pxt.editor.IProjectView) {
+    pxt.tickEvent(`tour.start`, { origin: "help-menu" });
+    parent.showOnboarding();
 }
 
 function renderDocItems(parent: pxt.editor.IProjectView, elements: pxt.DocMenuEntry[], cls: string = "") {
@@ -57,6 +63,11 @@ function getDocsLanguageItem(editor: DocsMenuEditorName, parent: pxt.editor.IPro
     return <DocsMenuItem key={"docsmenu" + path} role="menuitem" ariaLabel={pxt.Util.rlf(editor)} text={pxt.Util.rlf(editor)} className={`ui ${cls}`} parent={parent} path={path} onItemClick={openDocs} />
 }
 
+function getTourItem(parent: pxt.editor.IProjectView, cls: string = ""): JSX.Element {
+    const path = "/tour";
+    return <DocsMenuItem key={"docsmenu" + path} role="menuitem" ariaLabel={lf("Tour")} text={lf("Tour")} className={`ui ${cls}`} parent={parent} path={path} onItemClick={startTour} />
+}
+
 type DocsMenuEditorName = "Blocks" | "JavaScript" | "Python";
 interface DocsMenuProps extends ISettingsProps {
     editor: DocsMenuEditorName;
@@ -68,6 +79,7 @@ export class DocsMenu extends data.PureComponent<DocsMenuProps, {}> {
         const targetTheme = pxt.appTarget.appTheme;
         return <sui.DropdownMenu role="menuitem" icon="help circle large"
             className="item mobile hide help-dropdown-menuitem" textClass={"landscape only"} title={lf("Help")} >
+            {targetTheme.tours?.editor && getTourItem(parent)}
             {renderDocItems(parent, targetTheme.docMenu)}
             {getDocsLanguageItem(this.props.editor, parent)}
         </sui.DropdownMenu>
@@ -104,6 +116,7 @@ export interface SettingsMenuProps extends ISettingsProps {
     greenScreen: boolean;
     accessibleBlocks: boolean;
     showShare?: boolean;
+    inBlocks: boolean;
 }
 
 // This Component overrides shouldComponentUpdate, be sure to update that if the state is updated
@@ -116,6 +129,7 @@ export interface SettingsMenuState {
 export class SettingsMenu extends data.Component<SettingsMenuProps, SettingsMenuState> {
     private readonly isAdmin: string;
 
+    dropdown: sui.DropdownMenu;
     constructor(props: SettingsMenuProps) {
         super(props);
         this.state = {
@@ -138,9 +152,11 @@ export class SettingsMenu extends data.Component<SettingsMenuProps, SettingsMenu
         this.pair = this.pair.bind(this);
         this.pairBluetooth = this.pairBluetooth.bind(this);
         this.showAboutDialog = this.showAboutDialog.bind(this);
+        this.showTurnBackTimeDialog = this.showTurnBackTimeDialog.bind(this);
         this.print = this.print.bind(this);
         this.signOutGithub = this.signOutGithub.bind(this);
         this.isAdmin = Util.parseQueryString(window.location.href)["admin"];
+        this.hide = this.hide.bind(this);
     }
 
     showExitAndSaveDialog() {
@@ -234,19 +250,24 @@ export class SettingsMenu extends data.Component<SettingsMenuProps, SettingsMenu
         this.props.parent.showAboutDialog();
     }
 
+    showTurnBackTimeDialog() {
+        pxt.tickEvent("menu.turnBackTime");
+        this.props.parent.showTurnBackTimeDialogAsync();
+    }
+
     print() {
         pxt.tickEvent("menu.print");
         this.props.parent.printCode();
     }
 
+    hide() {
+        this.dropdown?.hide();
+    }
+
     signOutGithub() {
         pxt.tickEvent("menu.github.signout");
-        const githubProvider = cloudsync.githubProvider();
-        if (githubProvider) {
-            githubProvider.logout();
-            this.props.parent.forceUpdate();
-            core.infoNotification(lf("Signed out from GitHub..."))
-        }
+        this.hide();
+        this.props.parent.signOutGithub();
     }
 
     UNSAFE_componentWillReceiveProps(nextProps: SettingsMenuProps) {
@@ -266,7 +287,8 @@ export class SettingsMenu extends data.Component<SettingsMenuProps, SettingsMenu
     shouldComponentUpdate(nextProps: SettingsMenuProps, nextState: SettingsMenuState, nextContext: any): boolean {
         return this.state.greenScreen != nextState.greenScreen
             || this.state.accessibleBlocks != nextState.accessibleBlocks
-            || this.state.showShare != nextState.showShare;
+            || this.state.showShare != nextState.showShare
+            || nextProps.inBlocks !== this.props.inBlocks
     }
 
     renderCore() {
@@ -281,11 +303,12 @@ export class SettingsMenu extends data.Component<SettingsMenuProps, SettingsMenu
         const disableFileAccessinMaciOs = targetTheme.disableFileAccessinMaciOs && (pxt.BrowserUtils.isIOS() || pxt.BrowserUtils.isMac())
         const disableFileAccessinAndroid = pxt.appTarget.appTheme.disableFileAccessinAndroid && pxt.BrowserUtils.isAndroid();
 
+        const headless = pxt.appTarget.simulator?.headless;
         const showHome = !targetTheme.lockedEditor && !isController && auth.hasIdentity();
         const showShare = this.props.showShare && pxt.appTarget.cloud?.sharing && !isController;
-        const showSave = !readOnly && !isController && !!targetTheme.saveInMenu && !disableFileAccessinMaciOs && !disableFileAccessinAndroid || this.isAdmin;
-        const showSimCollapse = !readOnly && !isController && !!targetTheme.simCollapseInMenu;
         const showGreenScreen = targetTheme.greenScreen || /greenscreen=1/i.test(window.location.href);
+        const showSave = !readOnly && !isController && !!targetTheme.saveInMenu && !disableFileAccessinMaciOs && !disableFileAccessinAndroid || this.isAdmin;
+        const showSimCollapse = !readOnly && !isController && !!targetTheme.simCollapseInMenu && !(headless && this.props.inBlocks);
         const showPrint = targetTheme.print && !pxt.BrowserUtils.isIE();
         const showProjectSettings = targetTheme.showProjectSettings;
         const docItems = targetTheme.docMenu && targetTheme.docMenu.filter(d => !d.tutorial);
@@ -300,18 +323,21 @@ export class SettingsMenu extends data.Component<SettingsMenuProps, SettingsMenu
 
         const showCenterDivider = targetTheme.selectLanguage || targetTheme.highContrast || showGreenScreen || githubUser;
 
-        return <sui.DropdownMenu role="menuitem" icon={'setting large'} title={lf("More...")} className="item icon more-dropdown-menuitem">
+        const simCollapseText = headless ? lf("Toggle the File Explorer") : lf("Toggle the simulator");
+
+        return <sui.DropdownMenu role="menuitem" icon={'setting large'} title={lf("More...")} className="item icon more-dropdown-menuitem" ref={ref => this.dropdown = ref}>
             {showHome && <sui.Item className="mobile only inherit" role="menuitem" icon="home" title={lf("Home")} text={lf("Home")} ariaLabel={lf("Home screen")} onClick={this.showExitAndSaveDialog} />}
             {showShare && <sui.Item className="mobile only inherit" role="menuitem" icon="share alternate" title={lf("Publish your game to create a shareable link")} text={lf("Share")} ariaLabel={lf("Share Project")} onClick={this.showShareDialog} />}
             {(showHome || showShare) && <div className="ui divider mobile only inherit" />}
             {showProjectSettings ? <sui.Item role="menuitem" icon="options" text={lf("Project Settings")} onClick={this.openSettings} /> : undefined}
             {packages ? <sui.Item role="menuitem" icon="disk outline" text={lf("Extensions")} onClick={this.showPackageDialog} /> : undefined}
-            {showPairDevice ? <sui.Item role="menuitem" icon={usbIcon} text={lf("Connect device")} onClick={this.pair} /> : undefined}
+            {showPairDevice ? <sui.Item role="menuitem" icon={usbIcon} text={lf("Connect Device")} onClick={this.pair} /> : undefined}
             {pxt.webBluetooth.isAvailable() ? <sui.Item role="menuitem" icon='bluetooth' text={lf("Pair Bluetooth")} onClick={this.pairBluetooth} /> : undefined}
             {showPrint ? <sui.Item role="menuitem" icon="print" text={lf("Print...")} onClick={this.print} /> : undefined}
             {showSave ? <sui.Item role="menuitem" icon="save" text={lf("Save Project")} onClick={this.saveProject} /> : undefined}
-            {!isController && showDelete ? <sui.Item role="menuitem" icon="trash" text={lf("Delete Project")} onClick={this.removeProject} /> : undefined}
-            {showSimCollapse ? <sui.Item role="menuitem" icon='toggle right' text={lf("Toggle the simulator")} onClick={this.toggleCollapse} /> : undefined}
+            {!isController ? <sui.Item role="menuitem" icon="trash" text={lf("Delete Project")} onClick={this.removeProject} /> : undefined}
+            {targetTheme.timeMachine ? <sui.Item role="menuitem" icon="history" text={lf("Version History")} onClick={this.showTurnBackTimeDialog} /> : undefined}
+            {showSimCollapse ? <sui.Item role="menuitem" icon='toggle right' text={simCollapseText} onClick={this.toggleCollapse} /> : undefined}
             <div className="ui divider"></div>
             {targetTheme.selectLanguage ? <sui.Item icon='xicon globe' role="menuitem" text={lf("Language")} onClick={this.showLanguagePicker} /> : undefined}
             {targetTheme.highContrast ? <sui.Item role="menuitem" text={highContrast ? lf("High Contrast Off") : lf("High Contrast On")} onClick={this.toggleHighContrast} /> : undefined}
@@ -323,7 +349,7 @@ export class SettingsMenu extends data.Component<SettingsMenuProps, SettingsMenu
                 <div className="avatar" role="presentation">
                     <img className="ui circular image" src={githubUser.photo} alt={lf("User picture")} />
                 </div>
-                {lf("Unlink GitHub")}
+                {lf("Disconnect GitHub")}
             </div> : undefined}
             {showCenterDivider && <div className="ui divider"></div>}
             {reportAbuse ? <sui.Item role="menuitem" icon="warning circle" text={lf("Report Abuse...")} onClick={this.showReportAbuse} /> : undefined}

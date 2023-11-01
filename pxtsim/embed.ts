@@ -28,6 +28,7 @@ namespace pxsim {
         single?: boolean;
         traceDisabled?: boolean;
         activePlayer?: 1 | 2 | 3 | 4 | undefined;
+        theme?: string | pxt.Map<string>;
     }
 
     export interface SimulatorInstructionsMessage extends SimulatorMessage {
@@ -102,7 +103,7 @@ namespace pxsim {
         id: string;
         data: string;
         sim?: boolean;
-        csvType?: undefined | "headers" | "row"; // if non-nullish pass to csv view instead
+        csvType?: undefined | "headers" | "row" | "clear"; // if non-nullish pass to csv view instead
         receivedTime?: number;
     }
     export interface SimulatorBulkSerialMessage extends SimulatorMessage {
@@ -272,6 +273,11 @@ namespace pxsim {
             | "button-fill"
             | "dpad-fill";
         color: string;
+    }
+
+    export interface SetMuteButtonStateMessage extends SimulatorMessage {
+        type: "setmutebuttonstate";
+        state: "muted" | "unmuted" | "disabled";
     }
 
     export namespace multiplayer {

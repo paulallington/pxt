@@ -7,6 +7,7 @@ namespace pxt.auth {
     const AUTH_LOGIN_STATE_KEY = "login-state"; // stored in local storage.
     const AUTH_USER_STATE_KEY = "user-state"; // stored in local storage.
     const X_PXT_TARGET = "x-pxt-target"; // header passed in auth rest calls.
+    const INTERACTIVE_LOGIN_UNTIL = "interactive-login-until"; // hint whether to prompt user or try SSO first.
 
     export type ApiResult<T> = {
         resp: T;
@@ -71,42 +72,91 @@ namespace pxt.auth {
     /**
      * Cloud-synced user state.
      */
-    export type State = {
+    export type UserState = {
         profile?: UserProfile;
         preferences?: UserPreferences;
     };
 
     let _client: AuthClient;
-    export function client(): AuthClient { return _client; }
+    export function client(): AuthClient {
+        if (authDisabled) return undefined;
+        return _client;
+    }
 
     const PREFERENCES_DEBOUNCE_MS = 1 * 1000;
     const PREFERENCES_DEBOUNCE_MAX_MS = 10 * 1000;
     let debouncePreferencesChangedTimeout = 0;
     let debouncePreferencesChangedStarted = 0;
 
-    export abstract class AuthClient {
-        /**
-         * In-memory cache of user profile state. This is persisted in local storage.
-         * DO NOT ACCESS DIRECTLY UNLESS YOU KNOW IT IS OK. Functions allowed direct
-         * access are marked as such below.
-         */
-        private state$: Readonly<State>;
+    //
+    // Local storage of auth token.
+    //
 
+    // Last known auth token state. This is provided as a convenience for legacy methods that cannot be made async.
+    // Preference hasAuthTokenAsync() over taking a dependency on this cached value.
+    export let cachedHasAuthToken = false;
+
+    async function setLocalStorageValueAsync(key: string, value: string | undefined): Promise<void> {
+        if (!!value)
+            return await pxt.storage.shared.setAsync(AUTH_CONTAINER, key, value);
+        else
+            return await pxt.storage.shared.delAsync(AUTH_CONTAINER, key);
+    }
+    async function getLocalStorageValueAsync(key: string): Promise<string | undefined> {
+        try { return await pxt.storage.shared.getAsync(AUTH_CONTAINER, key); } catch { return undefined; }
+    }
+
+    export async function getAuthTokenAsync(): Promise<string> {
+        const token = await getLocalStorageValueAsync(CSRF_TOKEN_KEY);
+        cachedHasAuthToken = !!token;
+        return token;
+    }
+    async function setAuthTokenAsync(token: string): Promise<void> {
+        cachedHasAuthToken = !!token;
+        return await setLocalStorageValueAsync(CSRF_TOKEN_KEY, token);
+    }
+    export async function hasAuthTokenAsync(): Promise<boolean> {
+        return !!(await getAuthTokenAsync());
+    }
+    async function delAuthTokenAsync(): Promise<void> {
+        cachedHasAuthToken = false;
+        return await setLocalStorageValueAsync(CSRF_TOKEN_KEY, undefined);
+    }
+
+    //
+    // Local storage of user state (profile and preferences).
+    //
+
+    // Last known user state. This is provided as a convenience for legacy methods that cannot be made async.
+    // Preference getUserStateAsync() over taking a dependency on this cached value.
+    export let cachedUserState: Readonly<UserState>;
+
+    export async function getUserStateAsync(): Promise<Readonly<UserState>> {
+        let userState: UserState;
+        try { userState = await pxt.storage.shared.getAsync(AUTH_CONTAINER, AUTH_USER_STATE_KEY); } catch { userState = {}; }
+        cachedUserState = userState;
+        return userState;
+    }
+    async function setUserStateAsync(state: UserState): Promise<void> {
+        cachedUserState = { ...state };
+        return await pxt.storage.shared.setAsync(AUTH_CONTAINER, AUTH_USER_STATE_KEY, state);
+    }
+    async function delUserStateAsync(): Promise<void> {
+        cachedUserState = undefined;
+        return await pxt.storage.shared.delAsync(AUTH_CONTAINER, AUTH_USER_STATE_KEY);
+    }
+
+    export abstract class AuthClient {
         constructor() {
             // Set global instance.
             _client = this;
         }
 
         public async initAsync() {
-            // Load state from local storage
-            try {
-                this.state$ = await pxt.storage.shared.getAsync<State>(AUTH_CONTAINER, AUTH_USER_STATE_KEY);
-            } catch { }
-            if (!this.state$) {
-                this.state$ = {};
-            }
-            this.setUserProfileAsync(this.state$.profile);
-            this.setUserPreferencesAsync(this.state$.preferences);
+            // Initialize user state from local storage.
+            const state = await getUserStateAsync();
+            this.setUserProfileAsync(state?.profile);
+            this.setUserPreferencesAsync(state?.preferences);
         }
 
         protected abstract onSignedIn(): Promise<void>;
@@ -117,10 +167,6 @@ namespace pxt.auth {
         protected abstract onProfileDeleted(userId: string): Promise<void>;
         protected abstract onApiError(err: any): Promise<void>;
         protected abstract onStateCleared(): Promise<void>
-
-        public async authTokenAsync(): Promise<string> {
-            return await pxt.storage.shared.getAsync(AUTH_CONTAINER, CSRF_TOKEN_KEY);
-        }
 
         /**
          * Starts the process of authenticating the user against the given identity
@@ -137,20 +183,8 @@ namespace pxt.auth {
 
             callbackState = callbackState ?? NilCallbackState;
 
-            const state = this.getState();
-
-            // See if we have a valid access token already.
-            if (!state.profile) { await this.authCheckAsync(); }
-
-            const currIdp = state.profile?.idp;
-
-            // Check if we're already signed into this identity provider.
-            if (currIdp?.provider === idp) {
-                pxt.debug(`loginAsync: Already signed into ${idp}.`);
-                return;
-            }
-
-            this.clearState();
+            // Clear local auth state so we can no longer make authenticated requests.
+            this.clearAuthStateAsync();
 
             // Store some continuation state in local storage so we can return to what
             // the user was doing before signing in.
@@ -160,23 +194,30 @@ namespace pxt.auth {
                 callbackState,
                 callbackPathname: window.location.pathname,
                 idp,
+                persistent
             };
-            await pxt.storage.shared.setAsync(AUTH_CONTAINER, AUTH_LOGIN_STATE_KEY, loginState);
+
+            // Should the user be prompted to interactively login, or can we try to silently login?
+            const interactiveUntil = parseInt(await getLocalStorageValueAsync(INTERACTIVE_LOGIN_UNTIL));
+            const interactiveLogin = (interactiveUntil || 0) > Date.now();
 
             // Redirect to the login endpoint.
             const loginUrl = pxt.Util.stringifyQueryString('/api/auth/login', {
                 response_type: "token",
                 provider: idp,
                 persistent,
-                redirect_uri: `${window.location.origin}${window.location.pathname}?authcallback=1&state=${loginState.key}`
-            })
+                redirect_uri: `${window.location.origin}${window.location.pathname}?authcallback=1&state=${loginState.key}`,
+                prompt: interactiveLogin ? "select_account" : "silent"
+            });
             const apiResult = await this.apiAsync<LoginResponse>(loginUrl);
 
             if (apiResult.success) {
+                loginState.authCodeVerifier = apiResult.resp.authCodeVerifier; // will be undefined unless configured for the target
+                await pxt.storage.shared.setAsync(AUTH_CONTAINER, AUTH_LOGIN_STATE_KEY, loginState);
                 pxt.tickEvent('auth.login.start', { 'provider': idp });
                 window.location.href = apiResult.resp.loginUrl;
             } else {
-                await this.onSignInFailed();
+                try { await this.onSignInFailed(); } catch {}
             }
         }
 
@@ -186,22 +227,55 @@ namespace pxt.auth {
         public async logoutAsync(continuationHash?: string) {
             if (!hasIdentity()) { return; }
 
+            await AuthClient.staticLogoutAsync(continuationHash);
+
+            try { await this.onStateCleared(); } catch {}
+            try { await this.onSignedOut(); } catch {}
+        }
+
+        /**
+         * Sign out the user and clear the auth token cookie.
+         */
+        public static async staticLogoutAsync(continuationHash?: string) {
+            if (!hasIdentity()) { return; }
+
             pxt.tickEvent('auth.logout');
 
-            // backend will clear the cookie token and pass back the provider logout endpoint.
-            await this.apiAsync('/api/auth/logout');
+            // Indicate that for the next minute, signin should be interactive.
+            // Use case: SSO signed in with the wrong account. User wants to sign in with a different account.
+            await setLocalStorageValueAsync(INTERACTIVE_LOGIN_UNTIL, (Date.now() + 60000).toString());
 
-            // Clear csrf token so we can no longer make authenticated requests.
-            await pxt.storage.shared.delAsync(AUTH_CONTAINER, CSRF_TOKEN_KEY);
+            continuationHash = continuationHash ? continuationHash.startsWith('#') ? continuationHash : `#${continuationHash}` : "";
+            const clientRedirect = `${window.location.origin}${window.location.pathname}${window.location.search}${continuationHash}`;
 
-            // Update state and UI to reflect logged out state.
-            this.clearState();
-            const hash = continuationHash ? continuationHash.startsWith('#') ? continuationHash : `#${continuationHash}` : "";
+            // Tell backend to clear the http-only auth cookie.
+            let logoutUri = "";
+            try {
+                const uri = pxt.Util.stringifyQueryString('/api/auth/logout', {
+                    redirect_uri: clientRedirect,
+                    authcallback: '1'
+                });
+                const apiResult = await AuthClient.staticApiAsync<LogoutResponse>(uri);
+                if (apiResult.success) {
+                    logoutUri = apiResult.resp.logoutUrl;
+                }
+            } catch {
+                // Ignore errors.
+            }
 
-            // Redirect to home screen, or skillmap home screen
+            // Clear local auth state so we can no longer make authenticated requests.
+            await delAuthTokenAsync();
+            await delUserStateAsync();
+
             if (pxt.BrowserUtils.hasWindow()) {
-                window.location.href = `${window.location.origin}${window.location.pathname}${hash}`;
-                location.reload();
+                if (logoutUri) {
+                    // Redirect to logout endpoint
+                    window.location.href = logoutUri;
+                } else {
+                    // Redirect to home screen
+                    window.location.href = clientRedirect;
+                    location.reload();
+                }
             }
         }
 
@@ -209,24 +283,18 @@ namespace pxt.auth {
             // only if we're logged in
             if (!await this.loggedInAsync()) { return; }
 
-            const userId = this.getState().profile?.id;
+            const state = await getUserStateAsync();
+            const userId = state?.profile?.id;
 
             const res = await this.apiAsync('/api/user', null, 'DELETE');
             if (res.err) {
-                await this.onApiError((res.err));
+                try { await this.onApiError((res.err)); } catch {}
             } else {
                 try {
-                    // Clear csrf token so we can no longer make authenticated requests.
-                    await pxt.storage.shared.delAsync(AUTH_CONTAINER, CSRF_TOKEN_KEY);
+                    // Clear local auth state so we can no longer make authenticated requests.
+                    await this.clearAuthStateAsync();
 
-                    try {
-                        await this.onProfileDeleted(userId);
-                    } catch {
-                        pxt.tickEvent('auth.profile.cloudToLocalFailed');
-                    }
-
-                    // Update state and UI to reflect logged out state.
-                    this.clearState();
+                    try { await this.onProfileDeleted(userId); } catch {}
                 }
                 finally {
                     pxt.tickEvent('auth.profile.deleted');
@@ -247,13 +315,13 @@ namespace pxt.auth {
 
         public async userProfileAsync(): Promise<UserProfile | undefined> {
             if (!await this.loggedInAsync()) { return undefined; }
-            const state = this.getState();
+            const state = await getUserStateAsync();
             return { ...state.profile };
         }
 
         public async userPreferencesAsync(): Promise<UserPreferences | undefined> {
             //if (!await this.loggedInAsync()) { return undefined; } // allow even when not signed in.
-            const state = this.getState();
+            const state = await getUserStateAsync();
             return { ...state.preferences };
         }
 
@@ -264,13 +332,12 @@ namespace pxt.auth {
          */
         public async authCheckAsync(): Promise<UserProfile | undefined> {
             if (!hasIdentity()) { return undefined; }
+            if (!(await hasAuthTokenAsync())) { return undefined; }
 
-            // Fail fast if we don't have csrf token.
-            if (!(await pxt.storage.shared.getAsync(AUTH_CONTAINER, CSRF_TOKEN_KEY))) { return undefined; }
+            const state = await getUserStateAsync();
 
-            const state = this.getState();
-
-            if (state.profile?.id) {
+            if (state?.profile?.id) {
+                // If we already have a user profile, return it.
                 if (!this.initialAuthCheck_) {
                     this.initialAuthCheck_ = Promise.resolve(state.profile);
                 }
@@ -284,8 +351,9 @@ namespace pxt.auth {
         }
 
         public async loggedInAsync(): Promise<boolean> {
-            await this.authCheckAsync();
-            return this.hasUserId();
+            const profile = await this.authCheckAsync();
+            if (!profile) return false;
+            return await this.hasUserIdAsync();
         }
 
         public async updateUserProfileAsync(opts: {
@@ -293,7 +361,7 @@ namespace pxt.auth {
             avatarUrl?: string
         }): Promise<boolean> {
             if (!await this.loggedInAsync()) { return false; }
-            const state = this.getState();
+            const state = await getUserStateAsync();
             const result = await this.apiAsync<UserProfile>('/api/user/profile', {
                 id: state.profile.id,
                 username: opts.username,
@@ -399,19 +467,21 @@ namespace pxt.auth {
             }
         }
 
-        /*protected*/ hasUserId(): boolean {
+        private async hasUserIdAsync(): Promise<boolean> {
             if (!hasIdentity()) { return false; }
-            const state = this.getState();
-            return !!state.profile?.id;
+            if (!(await hasAuthTokenAsync())) { return undefined; }
+            const state = await getUserStateAsync();
+            return !!state?.profile?.id;
         }
 
         private async fetchUserAsync(): Promise<UserProfile | undefined> {
             if (!hasIdentity()) { return undefined; }
+            if (!(await hasAuthTokenAsync())) { return undefined; }
 
-            const state = this.getState();
+            const state = await getUserStateAsync();
 
             // We already have a user, no need to get it again.
-            if (state.profile?.id) {
+            if (state?.profile?.id) {
                 return state.profile;
             }
 
@@ -425,36 +495,38 @@ namespace pxt.auth {
         }
 
         private async setUserProfileAsync(profile: UserProfile) {
-            const wasLoggedIn = this.hasUserId();
-            this.transformUserProfile(profile);
-            const isLoggedIn = this.hasUserId();
-            this.onUserProfileChanged();
+            const wasLoggedIn = await this.hasUserIdAsync();
+            await this.transformUserProfileAsync(profile);
+            const isLoggedIn = await this.hasUserIdAsync();
+            try { await this.onUserProfileChanged(); } catch {}
             //pxt.data.invalidate(USER_PROFILE);
             if (isLoggedIn && !wasLoggedIn) {
-                await this.onSignedIn();
+                try { await this.onSignedIn(); } catch {}
                 //pxt.data.invalidate(LOGGED_IN);
             } else if (!isLoggedIn && wasLoggedIn) {
-                await this.onSignedOut();
+                try { await this.onSignedOut(); } catch {}
                 //pxt.data.invalidate(LOGGED_IN);
             }
         }
 
-        private async setUserPreferencesAsync(newPref: Partial<UserPreferences>) {
-            const oldPref = this.getState().preferences ?? DEFAULT_USER_PREFERENCES()
+        private async setUserPreferencesAsync(newPref: Partial<UserPreferences>): Promise<UserPreferences> {
+            const state = await getUserStateAsync();
+            const oldPref = state?.preferences ?? DEFAULT_USER_PREFERENCES()
             const diff = ts.pxtc.jsonPatch.diff(oldPref, newPref);
             // update
-            this.transformUserPreferences({
+            const finalPref = await this.transformUserPreferencesAsync({
                 ...oldPref,
                 ...newPref
             });
-            await this.onUserPreferencesChanged(diff);
+            try { await this.onUserPreferencesChanged(diff); } catch {}
+            return finalPref;
         }
 
         private async fetchUserPreferencesAsync(): Promise<UserPreferences | undefined> {
             // Wait for the initial auth
             if (!await this.loggedInAsync()) { return undefined; }
 
-            const state = this.getState();
+            const state = await getUserStateAsync();
 
             const result = await this.apiAsync<Partial<UserPreferences>>('/api/user/preferences');
             if (result.success) {
@@ -463,10 +535,10 @@ namespace pxt.auth {
                     // Note the cloud should send partial information back if it is missing
                     // a field. So e.g. if the language has never been set in the cloud, it won't
                     // overwrite the local state.
-                    this.setUserPreferencesAsync(result.resp);
+                    const prefs = this.setUserPreferencesAsync(result.resp);
 
                     // update our one-time promise for the initial load
-                    return state.preferences;
+                    return prefs;
                 }
             }
             return undefined;
@@ -474,63 +546,52 @@ namespace pxt.auth {
 
         /**
          * Updates user profile state and writes it to local storage.
-         * Direct access to state$ allowed.
          */
-        private transformUserProfile(profile: UserProfile) {
-            this.state$ = {
-                ...this.state$,
+        private async transformUserProfileAsync(profile: UserProfile): Promise<UserProfile> {
+            let state = await getUserStateAsync();
+            state = {
+                ...state,
                 profile: {
                     ...profile
                 }
             };
-            this.saveState();
+            await setUserStateAsync(state);
+            return state.profile;
         }
 
         /**
          * Updates user preference state and writes it to local storage.
-         * Direct access to state$ allowed.
          */
-        protected transformUserPreferences(preferences: UserPreferences) {
-            this.state$ = {
-                ...this.state$,
+        protected async transformUserPreferencesAsync(preferences: UserPreferences): Promise<UserPreferences> {
+            let state = await getUserStateAsync();
+            state = {
+                ...state,
                 preferences: {
                     ...preferences
                 }
             };
-            this.saveState();
+            await setUserStateAsync(state);
+            return state.preferences;
         }
 
         /**
-         * Read-only access to current state.
-         * Direct access to state$ allowed.
+         * Clear local auth state then call the onStateCleared callback.
          */
-        /*private*/ getState(): Readonly<State> {
-            return this.state$;
-        };
-
-        /**
-         * Write auth state to local storage.
-         * Direct access to state$ allowed.
-         */
-        private saveState() {
-            pxt.storage.shared.setAsync(AUTH_CONTAINER, AUTH_USER_STATE_KEY, this.state$).then(() => { });
+        private async clearAuthStateAsync() {
+            await delAuthTokenAsync();
+            await delUserStateAsync();
+            try { await this.onStateCleared(); } catch {}
         }
 
-        /**
-         * Clear all auth state.
-         * Direct access to state$ allowed.
-         */
-        private clearState() {
-            this.state$ = {};
-            pxt.storage.shared.delAsync(AUTH_CONTAINER, AUTH_USER_STATE_KEY)
-                .then(() => this.onStateCleared());
+        /*protected*/ async apiAsync<T = any>(url: string, data?: any, method?: string, authToken?: string): Promise<ApiResult<T>> {
+            return await AuthClient.staticApiAsync(url, data, method, authToken);
         }
 
-        /*protected*/ async apiAsync<T = any>(url: string, data?: any, method?: string): Promise<ApiResult<T>> {
+        static async staticApiAsync<T = any>(url: string, data?: any, method?: string, authToken?: string): Promise<ApiResult<T>> {
             const headers: pxt.Map<string> = {};
-            const csrfToken = await pxt.storage.shared.getAsync<string>(AUTH_CONTAINER, CSRF_TOKEN_KEY);
-            if (csrfToken) {
-                headers["authorization"] = `mkcd ${csrfToken}`;
+            authToken = authToken || (await getAuthTokenAsync());
+            if (authToken) {
+                headers["authorization"] = `mkcd ${authToken}`;
             }
             headers[X_PXT_TARGET] = pxt.appTarget?.id;
 
@@ -552,7 +613,7 @@ namespace pxt.auth {
             }).catch(async (e) => {
                 if (!/logout/.test(url) && e.statusCode == 401) {
                     // 401/Unauthorized. logout now.
-                    await this.logoutAsync();
+                    await AuthClient.staticLogoutAsync();
                 }
                 return {
                     statusCode: e.statusCode,
@@ -583,10 +644,17 @@ namespace pxt.auth {
         callbackState: CallbackState;
         callbackPathname: string;
         idp: pxt.IdentityProviderId;
+        authCodeVerifier?: string;
+        persistent: boolean;
     };
 
     type LoginResponse = {
         loginUrl: string;
+        authCodeVerifier: string;
+    };
+
+    type LogoutResponse = {
+        logoutUrl?: string;
     };
 
     export async function loginCallbackAsync(qs: pxt.Map<string>): Promise<void> {
@@ -633,11 +701,23 @@ namespace pxt.auth {
                 break;
             }
 
+            // If this auth request was assigned an auth code, claim it now. This will set
+            // the required auth cookie in this domain (for cross-domain authentication).
+            if (loginState.authCodeVerifier) {
+                const otacCheckUrl = pxt.Util.stringifyQueryString('/api/otac/check', {
+                    persistent: loginState.persistent,
+                });
+                await AuthClient.staticApiAsync(otacCheckUrl, null, null, loginState.authCodeVerifier);
+            }
+
             // Store csrf token in local storage. It is ok to do this even when
             // "Remember me" wasn't selected because this token is not usable
             // without its cookie-based counterpart. When "Remember me" is false,
             // the cookie is not persisted.
-            await pxt.storage.shared.setAsync(AUTH_CONTAINER, CSRF_TOKEN_KEY, authToken);
+            await setAuthTokenAsync(authToken);
+
+            // Clear interactive login flag. Next auth request will try silent SSO first.
+            await setLocalStorageValueAsync(INTERACTIVE_LOGIN_UNTIL, undefined);
 
             pxt.tickEvent('auth.login.success', { 'provider': loginState.idp });
         } while (false);
@@ -646,7 +726,7 @@ namespace pxt.auth {
         const hash = callbackState.hash.startsWith('#') ? callbackState.hash : `#${callbackState.hash}`;
         const params = pxt.Util.stringifyQueryString('', callbackState.params);
         const pathname = loginState.callbackPathname.startsWith('/') ? loginState.callbackPathname : `/${loginState.callbackPathname}`;
-        const redirect = `${pathname}${hash}${params}`;
+        const redirect = `${pathname}${params}${hash}`;
         window.location.href = redirect;
     }
 
@@ -677,8 +757,8 @@ namespace pxt.auth {
         return user?.idp?.displayName ?? user?.idp?.username ?? EMPTY_USERNAME;
     }
 
-    export function identityProviderId(): pxt.IdentityProviderId | undefined {
-        return client()?.getState()?.profile?.idp?.provider;
+    export function identityProviderId(user: pxt.auth.UserProfile): pxt.IdentityProviderId | undefined {
+        return user?.idp?.provider;
     }
 
     export function firstName(user: pxt.auth.UserProfile): string {

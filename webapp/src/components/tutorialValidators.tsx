@@ -1,19 +1,17 @@
 import { MarkedContent } from "../marked";
 import { getBlocksEditor } from "../app";
-import TutorialOptions = pxt.tutorial.TutorialOptions;
-import TutorialStepInfo = pxt.tutorial.TutorialStepInfo;
 import CodeValidator = pxt.tutorial.CodeValidator;
 import CodeValidatorMetadata = pxt.tutorial.CodeValidatorMetadata;
 import CodeValidationResult = pxt.tutorial.CodeValidationResult;
 import CodeValidationExecuteOptions = pxt.tutorial.CodeValidationExecuteOptions;
 
-const defaultResult: CodeValidationResult = {
+const defaultResult: () => CodeValidationResult = () => ({
     isValid: true,
     hint: null,
-};
+});
 
 export function GetValidator(metadata: CodeValidatorMetadata): CodeValidator {
-    switch(metadata.validatorType.toLowerCase()) {
+    switch (metadata.validatorType.toLowerCase()) {
         case "blocksexistvalidator":
             return new BlocksExistValidator(metadata.properties);
         default:
@@ -26,12 +24,12 @@ abstract class CodeValidatorBase implements CodeValidator {
     enabled: boolean;
     abstract name: string;
 
-    constructor(properties: {[index: string]: string}) {
-        this.enabled = properties["enabled"]?.toLowerCase() != "false"; // Default to true
+    constructor(properties: pxt.tutorial.CodeValidatorBaseProperties) {
+        this.enabled = properties.enabled?.toLowerCase() != "false"; // Default to true
     }
 
-    execute(options: CodeValidationExecuteOptions): Promise<CodeValidationResult> {
-        if (!this.enabled) return Promise.resolve(defaultResult);
+    async execute(options: CodeValidationExecuteOptions): Promise<CodeValidationResult> {
+        if (!this.enabled) return defaultResult();
 
         return this.executeInternal(options);
     }
@@ -41,46 +39,66 @@ abstract class CodeValidatorBase implements CodeValidator {
 
 export class BlocksExistValidator extends CodeValidatorBase {
     name = "blocksexistvalidator";
+    markers: string[];
+
+    constructor(properties: pxt.tutorial.CodeValidatorBaseProperties) {
+        super(properties);
+        if (properties.markers) {
+            this.markers = properties.markers.split(",").map(m => m.trim());
+        }
+    }
 
     async executeInternal(options: CodeValidationExecuteOptions): Promise<CodeValidationResult> {
-        let missingBlocks: string[] = [];
-        let disabledBlocks: string[] = [];
-        const {parent, tutorialOptions} = options;
-        const stepInfo = tutorialOptions.tutorialStepInfo
-            ? tutorialOptions.tutorialStepInfo[tutorialOptions.tutorialStep]
-            : null;
+        const { parent, tutorialOptions } = options;
+        const stepInfo = tutorialOptions.tutorialStepInfo?.[tutorialOptions.tutorialStep];
+
         if (!stepInfo) {
-            return defaultResult;
+            return defaultResult();
         }
 
         const editor = getBlocksEditor()?.editor;
         if (!editor) {
-            return defaultResult;
+            return defaultResult();
         }
 
-        const userBlocks = editor.getAllBlocks(false /* ordered */);
-        const userBlocksEnabledByType = new Map<string, boolean>(); // Key = type, value = enabled
-        userBlocks?.forEach(b => userBlocksEnabledByType.set(b.type, userBlocksEnabledByType.get(b.type) || b.isEnabled()));
-
-        const allHighlightedBlocks = await getTutorialHighlightedBlocks(tutorialOptions, stepInfo);
-        if (!allHighlightedBlocks) {
-            return defaultResult;
+        // if no valid markers are specified, default to "highlight" and "validate-exists"
+        if (!this.markers || (!this.markers.includes("highlight") && !this.markers.includes("validate-exists"))) {
+            this.markers = ["highlight", "validate-exists"];
         }
 
-        const stepHash = getTutorialStepHash(tutorialOptions);
-        const stepHighlights = allHighlightedBlocks[stepHash];
-        const highlightedBlockKeys = stepHighlights ? Object.keys(stepHighlights) : [];
-
-        for (let i: number = 0; i < highlightedBlockKeys.length; i++) {
-            let tutorialBlockKey = highlightedBlockKeys[i];
-            const isEnabled = userBlocksEnabledByType.get(tutorialBlockKey);
-            if (isEnabled === undefined) {
-                // user did not use a specific block
-                missingBlocks.push(tutorialBlockKey);
-            } else if (!isEnabled) {
-                disabledBlocks.push(tutorialBlockKey);
-            }
+        const allHighlightedBlocks = await pxt.tutorial.getTutorialHighlightedBlocks(tutorialOptions);
+        const allValidateBlocks = await pxt.tutorial.getTutorialValidateBlocks(tutorialOptions);
+        if (!allHighlightedBlocks && !allValidateBlocks) {
+            return defaultResult();
         }
+
+        const stepHash = pxt.tutorial.getTutorialStepHash(tutorialOptions);
+        let highlightBlocksCount: pxt.Map<number> = {};
+        let validateBlocksCount: pxt.Map<number> = {};
+
+        if (allHighlightedBlocks && this.markers.includes("highlight")) {
+            highlightBlocksCount = allHighlightedBlocks[stepHash];
+        }
+
+        if (allValidateBlocks && this.markers.includes("validate-exists")) {
+            const stepValidateBlocks = allValidateBlocks[stepHash];
+            validateBlocksCount = pxt.tutorial.getRequiredBlockCounts(stepValidateBlocks);
+        }
+
+        // Combine the two block counts
+        const requiredBlockCounts: pxt.Map<number> = {...highlightBlocksCount};
+        for (const block in validateBlocksCount) {
+            requiredBlockCounts[block] = (requiredBlockCounts[block] || 0) + validateBlocksCount[block];
+        }
+
+        const {
+            missingBlocks,
+            disabledBlocks,
+            insufficientBlocks
+        } = pxt.blocks.validateBlocksExist({
+            usedBlocks: editor.getAllBlocks(false /* ordered */),
+            requiredBlockCounts: requiredBlockCounts,
+        });
 
         let isValid = true;
         let errorDescription: string;
@@ -94,6 +112,9 @@ export class BlocksExistValidator extends CodeValidatorBase {
         } else if (disabledBlocks.length > 0) {
             isValid = false;
             errorDescription = lf("Make sure your blocks are connected to the rest of your code like this.");
+        } else if (insufficientBlocks.length > 0) {
+            isValid = false;
+            errorDescription = lf("Make sure you have enough blocks and that they're connected to the rest of your code. It should look like this.");
         }
 
         const blockImages = stepInfo?.hintContentMd ? (<div>
@@ -107,34 +128,4 @@ export class BlocksExistValidator extends CodeValidatorBase {
             hint: isValid ? undefined : blockImages,
         }
     }
-}
-
-function getTutorialHighlightedBlocks(tutorial: TutorialOptions, step: TutorialStepInfo): Promise<pxt.Map<pxt.Map<number>> | undefined> {
-    return pxt.BrowserUtils.tutorialInfoDbAsync().then((db) =>
-        db.getAsync(tutorial.tutorial, tutorial.tutorialCode).then((entry) => {
-            if (entry?.highlightBlocks) {
-                return Promise.resolve(entry.highlightBlocks);
-            } else {
-                return Promise.resolve(undefined);
-            }
-        })
-    );
-}
-
-function getTutorialStepHash(tutorial: TutorialOptions): string {
-    const { tutorialStepInfo, tutorialStep } = tutorial;
-    const body = tutorialStepInfo[tutorialStep].hintContentMd;
-    let hintCode = "";
-    if (body != undefined) {
-        body.replace(/((?!.)\s)+/g, "\n")
-            .replace(
-                /``` *(block|blocks)\s*\n([\s\S]*?)\n```/gim,
-                function (m0, m1, m2) {
-                    hintCode = `{\n${m2}\n}`;
-                    return "";
-                }
-            );
-    }
-
-    return pxt.BrowserUtils.getTutorialCodeHash([hintCode]);
 }

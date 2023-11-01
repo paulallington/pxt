@@ -116,7 +116,16 @@ namespace pxt.Cloud {
         })
     }
 
-    export async function markdownAsync(docid: string, locale?: string): Promise<string> {
+    export function downloadScriptMetaAsync(id: string): Promise<JsonScriptMeta> {
+        return privateRequestAsync({
+            url: id + (id.startsWith("S") ? `?time=${Date.now()}` : ""),
+            forceLiveEndpoint: true,
+        }).then(resp => {
+            return JSON.parse(resp.text).meta;
+        })
+    }
+
+    export async function markdownAsync(docid: string, locale?: string, propagateExceptions?: boolean): Promise<string> {
         // 1h check on markdown content if not on development server
         const MARKDOWN_EXPIRATION = pxt.BrowserUtils.isLocalHostDev() ? 0 : 1 * 60 * 60 * 1000;
         // 1w check don't use cached version and wait for new content
@@ -137,8 +146,12 @@ namespace pxt.Cloud {
                     return r.md;
                 }
                 return entry.md;
-            } catch {
-                return ""; // no translation
+            } catch (e) {
+                if (propagateExceptions) {
+                    throw e;
+                } else {
+                    return ""; // no translation
+                }
             }
         };
 
@@ -247,7 +260,7 @@ namespace pxt.Cloud {
         const domainCheck = `(?:(?:https:\/\/)?(?:${domains.join('|')})\/)`;
         const versionRefCheck = "(?:v[0-9]+\/)";
         const oembedCheck = "api\/oembed\\?url=.*%2F([^&#]*)&.*";
-        const sharePageCheck = "([a-z0-9\\-_]+)(?:[#?&].*)?";
+        const sharePageCheck = "\/?([a-z0-9\\-_]+)(?:[#?&].*)?";
         const scriptIdCheck = `^${domainCheck}?${versionRefCheck}?(?:(?:${oembedCheck})|(?:${sharePageCheck}))$`;
         const m = new RegExp(scriptIdCheck, 'i').exec(uri.trim());
         const scriptid = m?.[1] /** oembed res **/ || m?.[2] /** share page res **/;
@@ -280,5 +293,6 @@ namespace pxt.Cloud {
         targetVersion?: string;
         meta?: JsonScriptMeta; // only in lite, bag of metadata
         thumb?: boolean;
+        persistId?: string;
     }
 }

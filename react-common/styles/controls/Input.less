@@ -122,10 +122,27 @@
 }
 
 /****************************************************
+ *                   Dropdown                       *
+ ****************************************************/
+.common-input-group > .common-button {
+    color: @textColor !important;
+}
+
+.common-menu-dropdown-pane {
+    z-index: 1;
+
+    .common-button {
+        padding: .8rem;
+        width: 100%;
+        text-align: start;
+    }
+}
+
+/****************************************************
  *                 High Contrast                    *
  ****************************************************/
 
-.high-contrast {
+.high-contrast, .hc {
     .common-input {
         color: @highContrastTextColor;
         border-color: @highContrastTextColor;

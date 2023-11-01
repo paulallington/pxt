@@ -333,6 +333,7 @@ export class DropdownMenu extends UIElement<DropdownProps, DropdownState> {
             displayAbove ? 'menuAbove' : '',
             displayRight ? 'menuRight' : '',
             displayLeft ? "menuLeft" : '',
+            disabled ? "disabled" : ''
         ]);
         const menuClasses = cx([
             'menu',
@@ -1134,6 +1135,7 @@ export interface ModalButton {
     approveButton?: boolean;
     labelPosition?: "left" | "right";
     ariaLabel?: string;
+    noCloseOnClick?: boolean;
 }
 
 export interface ModalProps extends ReactModal.Props {

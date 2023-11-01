@@ -13,6 +13,7 @@ interface SimulatorConfig {
     onStateChanged(state: pxsim.SimulatorState): void;
     onSimulatorReady(): void;
     setState(key: string, value: any): void;
+    onMuteButtonStateChange(state: pxt.editor.MuteState): void;
     editor: string;
 }
 
@@ -232,6 +233,7 @@ export function init(root: HTMLElement, cfg: SimulatorConfig) {
         onTopLevelCodeEnd: () => {
             postSimEditorEvent("toplevelfinished");
         },
+        onMuteButtonStateChange: cfg.onMuteButtonStateChange,
         stoppedClass: pxt.appTarget.simulator && pxt.appTarget.simulator.stoppedClass,
         invalidatedClass: pxt.appTarget.simulator && pxt.appTarget.simulator.invalidatedClass,
         nestedEditorSim,
@@ -295,7 +297,7 @@ export function run(pkg: pxt.MainPackage, debug: boolean,
     const { mute, highContrast, light, clickTrigger, storedState, autoRun } = options;
     const isIpcRenderer = pxt.BrowserUtils.isIpcRenderer() || undefined;
     const dependencies: pxt.Map<string> = {}
-    for(const dep of pkg.sortedDeps())
+    for (const dep of pkg.sortedDeps())
         dependencies[dep.id] = dep.version()
 
     const playerNumber = allParts && allParts.indexOf("multiplayer") >= 0 ? 1 : undefined;
@@ -306,6 +308,8 @@ export function run(pkg: pxt.MainPackage, debug: boolean,
             root?.style?.removeProperty(cssVar);
         }
     }
+
+    const theme = pkg.config.theme || (pxt.appTarget.appTheme.matchWebUSBDeviceInSim && pxt.packetio.isConnected() && pxt.packetio.deviceVariant());
 
     const opts: pxsim.SimulatorRunOptions = {
         boardDefinition: boardDefinition,
@@ -329,7 +333,8 @@ export function run(pkg: pxt.MainPackage, debug: boolean,
         autoRun,
         ipc: isIpcRenderer,
         dependencies,
-        activePlayer: playerNumber
+        activePlayer: playerNumber,
+        theme: theme,
     }
     //if (pxt.options.debug)
     //    pxt.debug(JSON.stringify(opts, null, 2))
@@ -345,7 +350,6 @@ export function mute(mute: boolean) {
 
 export function stop(unload?: boolean, starting?: boolean) {
     if (!driver) return;
-    driver.stopSound();
     driver.stop(unload, starting);
 }
 

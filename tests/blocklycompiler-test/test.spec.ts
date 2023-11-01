@@ -422,6 +422,10 @@ describe("blockly compiler", function () {
         it("should declare variable types when the initializer expression has a generic type", (done: () => void) => {
             blockTestAsync("array_type_declaration_in_set").then(done, done);
         });
+
+        it("shouldn't pollute the global primitive types when unifying variables", (done: () => void) => {
+            blockTestAsync("primitive_type_inference").then(done, done);
+        });
     });
 
     describe("compiling functions", () => {
@@ -510,6 +514,10 @@ describe("blockly compiler", function () {
         it("should convert enums to constants when emitAsConstant is set", done => {
             blockTestAsync("enum_constants").then(done, done);
         });
+
+        it("should compile gridTemplate blocks to template strings", done => {
+            blockTestAsync("grid_template_string").then(done, done);
+        })
     });
 
     describe("compiling expandable blocks", () => {

@@ -6,10 +6,14 @@ import * as core from "./core";
 import * as coretsx from "./coretsx";
 import * as pkg from "./package";
 import * as cloudsync from "./cloudsync";
+import * as workspace from "./workspace";
 
 import Cloud = pxt.Cloud;
 import Util = pxt.Util;
+import { TimeMachine } from "./timeMachine";
 import { fireClickOnEnter } from "./util";
+import { pairAsync } from "./cmds";
+import { invalidate } from "./data";
 
 let dontShowDownloadFlag = false;
 
@@ -737,15 +741,17 @@ export function promptTranslateBlock(blockid: string, blockTranslationIds: strin
     });
 }
 
-export function renderBrowserDownloadInstructions(saveonly?: boolean) {
+export function renderBrowserDownloadInstructions(saveonly?: boolean, redeploy?: () => Promise<void>) {
     const boardName = pxt.appTarget.appTheme.boardName || lf("device");
     const boardDriveName = pxt.appTarget.appTheme.driveDisplayName || pxt.appTarget.compile.driveName || "???";
     const fileExtension = pxt.appTarget.compile?.useUF2 ? ".uf2" : ".hex";
     const webUSBSupported = pxt.usb.isEnabled && pxt.appTarget?.compile?.webUSB;
 
-    const onPairClicked = () => {
+    const onPairClicked = async () => {
         core.hideDialog();
-        pxt.commands.webUsbPairDialogAsync(pxt.usb.pairAsync, core.confirmAsync);
+        const successfulPairing = await pairAsync(true);
+        if (redeploy && successfulPairing)
+            await redeploy();
     }
 
     const onCheckboxClicked = (value: boolean) => {
@@ -772,17 +778,16 @@ export function renderBrowserDownloadInstructions(saveonly?: boolean) {
                                         </div>
                                         {webUSBSupported &&
                                             <div className="download-callout">
-                                                <label className="ui purple ribbon large label">{lf("New!")}</label>
-                                                <div className="ui two column grid">
+                                                <label className="ui purple ribbon label">{lf("Want faster downloads?")}</label>
+                                                <div className="ui two column grid content">
                                                     <div className="icon-align three wide column">
                                                         <div />
                                                         <i className="icon big usb" />
                                                         <div />
                                                     </div>
                                                     <div className="thirteen wide column">
-                                                        {lf("Download your code faster by pairing with web usb!")}
-                                                        <br />
-                                                        <strong><a onClick={onPairClicked}>{lf("Pair now")}</a></strong>
+                                                        {lf("Download your code faster by pairing with WebUSB!")}
+                                                        <a className="ui button purple" onClick={onPairClicked}>{lf("Pair Now")}</a>
                                                     </div>
                                                 </div>
                                             </div>
@@ -853,4 +858,84 @@ export function clearDontShowDownloadDialogFlag() {
 
 export function isDontShowDownloadDialogFlagSet() {
     return dontShowDownloadFlag;
+}
+
+export async function showTurnBackTimeDialogAsync(header: pxt.workspace.Header, reloadHeader: () => void) {
+    const text = await workspace.getTextAsync(header.id, true);
+    let history: pxt.workspace.HistoryFile;
+
+    if (text?.[pxt.HISTORY_FILE]) {
+        history = pxt.workspace.parseHistoryFile(text[pxt.HISTORY_FILE]);
+    }
+
+    const loadProject = async (text: pxt.workspace.ScriptText, editorVersion: string) => {
+        core.hideDialog();
+
+        header.targetVersion = editorVersion;
+
+        await workspace.saveSnapshotAsync(header.id);
+        await workspace.saveAsync(header, text);
+        reloadHeader();
+    }
+
+    const copyProject = async (text: pxt.workspace.ScriptText, editorVersion: string, timestamp?: number) => {
+        core.hideDialog();
+
+        let newHistory = history
+
+        if (timestamp != undefined) {
+            newHistory = {
+                entries:  history.entries.slice(0, history.entries.findIndex(e => e.timestamp === timestamp)),
+                snapshots: history.snapshots.filter(s => s.timestamp <= timestamp),
+                shares: history.shares.filter(s => s.timestamp <= timestamp)
+            }
+        }
+
+        if (text[pxt.HISTORY_FILE]) {
+            text[pxt.HISTORY_FILE] = JSON.stringify(newHistory);
+        }
+        const date = new Date(timestamp);
+
+        const dateString = date.toLocaleDateString(
+            pxt.U.userLanguage(),
+            {
+                year: "numeric",
+                month: "numeric",
+                day: "numeric"
+            }
+        );
+
+        const timeString = date.toLocaleTimeString(
+            pxt.U.userLanguage(),
+            {
+                timeStyle: "short"
+            } as any
+        );
+
+        const newHeader: pxt.workspace.Header = {
+            ...header,
+            targetVersion: editorVersion
+        }
+
+        await workspace.duplicateAsync(newHeader, `${newHeader.name} ${dateString} ${timeString}`, text);
+
+        invalidate("headers:");
+
+        core.infoNotification(lf("Project copy saved to My Projects"))
+    }
+
+    await core.dialogAsync({
+        header: lf("Turn back time"),
+        className: "time-machine-dialog",
+        size: "fullscreen",
+        hasCloseIcon: true,
+        jsx: (
+            <TimeMachine
+                history={history}
+                text={text}
+                onProjectLoad={loadProject}
+                onProjectCopy={copyProject}
+            />
+        )
+    })
 }

@@ -28,9 +28,12 @@ declare namespace pxt {
         // localized galleries
         localizedGalleries?: pxt.Map<pxt.Map<string>>;
         windowsStoreLink?: string;
+        // localized options on download dialog; name, description, url, imageUrl, variant used.
+        hardwareOptions?: CodeCard[];
         // release manifest for the electron app
         electronManifest?: pxt.electron.ElectronManifest;
         profileNotification?: ProfileNotification;
+        kiosk?: KioskConfig;
     }
 
     interface PackagesConfig {
@@ -75,6 +78,17 @@ declare namespace pxt {
         image?: string;
     }
 
+    interface KioskConfig {
+        games: KioskGame[];
+    }
+
+    interface KioskGame {
+        id: string;
+        name: string;
+        description: string;
+        highScoreMode: string;
+    }
+
     interface AppTarget {
         id: string; // has to match ^[a-z]+$; used in URLs and domain names
         platformid?: string; // eg "codal"; used when search for gh packages ("for PXT/codal"); defaults to id
@@ -105,6 +119,7 @@ declare namespace pxt {
         cacheusedblocksdirs?: string[]; // list of /docs subfolders for parsing and caching used block ids (for tutorial loading)
         blockIdMap?: Map<string[]>; // list of target-specific blocks that are "synonyms" (eg. "agentturnright" and "minecraftAgentTurn")
         defaultBadges?: pxt.auth.Badge[];
+        noSimShims?: boolean; // skip check for simshims and only build from cpp / user level typescript.
     }
 
     interface BrowserOptions {
@@ -207,7 +222,7 @@ declare namespace pxt {
         cloudProviders?: pxt.Map<AppCloudProvider>;
     }
 
-    type IdentityProviderId = "makecode" | "microsoft" | "google" | "github";
+    type IdentityProviderId = "makecode" | "microsoft" | "google" | "github" | "clever";
 
     interface AppCloudProvider {
         id: IdentityProviderId;
@@ -443,6 +458,7 @@ declare namespace pxt {
         experimentalHw?: boolean; // enable experimental hardware
         // recipes?: boolean; // inlined tutorials - deprecated
         checkForHwVariantWebUSB?: boolean; // check for hardware variant using webusb before compiling
+        preferWebUSBDownload?: boolean; // default to webusb over normal browser download when available
         shareFinishedTutorials?: boolean; // always pop a share dialog once the tutorial is finished
         leanShare?: boolean; // use leanscript.html instead of script.html for sharing pages
         nameProjectFirst?: boolean; // prompt user to name project when creating new one
@@ -466,7 +482,6 @@ declare namespace pxt {
         embeddedTutorial?: boolean;
         disableBlobObjectDownload?: boolean; // use data uri downloads instead of object urls
         immersiveReader?: boolean; // enables the immersive reader for tutorials
-        tutorialCodeValidation?: boolean; // Enable code validation for tutorials
         downloadDialogTheme?: DownloadDialogTheme;
         songEditor?: boolean; // enable the song asset type and field editor
         multiplayer?: boolean; // enable multiplayer features
@@ -474,6 +489,17 @@ declare namespace pxt {
         javaScript?: boolean; // allow javascript blocks
         showDelete?: boolean; // show delete option in menu
         showReset?: boolean; // show reset option in menu
+        tours?: {
+            editor?: string // path to markdown file for the editor tour steps
+        }
+        tutorialSimSidebarLayout?: boolean; // Enable tutorial layout with the sim in the sidebar (desktop only)
+        showOpenInVscode?: boolean; // show the open in VS Code button
+        matchWebUSBDeviceInSim?: boolean; // if set, pass current device id as theme to sim when available.
+        condenseProfile?: boolean; // if set, will make the profile dialog smaller
+        cloudProfileIcon?: string; // the file path for added imagery on smaller profile dialogs
+        timeMachine?: boolean; // Save/restore old versions of a project experiment
+        blocklySoundVolume?: number; // A number between 0 and 1 that sets the volume for blockly sounds (e.g. connect, disconnect, click)
+        timeMachineQueryParams?: string[]; // An array of query params to pass to timemachine iframe embed
     }
 
     interface DownloadDialogTheme {
@@ -484,7 +510,6 @@ declare namespace pxt {
         deviceSuccessIcon?: string;
         downloadMenuHelpURL?: string;
         downloadHelpURL?: string;
-        firmwareHelpURL?: string;
         troubleshootWebUSBHelpURL?: string;
         incompatibleHardwareHelpURL?: string;
 
@@ -492,9 +517,17 @@ declare namespace pxt {
         connectDeviceImage?: string;
         selectDeviceImage?: string;
         connectionSuccessImage?: string;
-        checkFirmwareVersionImage?: string;
-        checkUSBCableImage?: string;
         incompatibleHardwareImage?: string;
+
+        browserUnpairImage?: string;
+        usbDeviceForgottenImage?: string;
+
+        // The following fields used to be displayed, but students
+        // found the dialog confusing / hard to use; now we redirect
+        // them to help docs instead if pairing fails for step by step instructions.
+        // checkFirmwareVersionImage?: string;
+        // checkUSBCableImage?: string;
+        // firmwareHelpURL?: string;
     }
 
     interface SocialOptions {
@@ -540,6 +573,7 @@ declare namespace pxt {
         usedBlocks: Map<number>;
         snippetBlocks: Map<Map<number>>;
         highlightBlocks: Map<Map<number>>;
+        validateBlocks: Map<Map<string[]>>;
     }
 
     interface PackageApiInfo {
@@ -801,6 +835,9 @@ declare namespace ts.pxtc {
         jresURL?: string;
         iconURL?: string;
         imageLiteral?: number;
+        gridLiteral?: number;
+        gridLiteralOnColor?: string;
+        gridLiteralOffColor?: string;
         imageLiteralColumns?: number; // optional number of columns
         imageLiteralRows?: number; // optional number of rows
         imageLiteralScale?: number; // button sizing between 0.6 and 2, default is 1
@@ -836,6 +873,8 @@ declare namespace ts.pxtc {
         locs?: pxt.Map<string>;
         toolboxParent?: string; // The ID of a block that will wrap this block in the toolbox. Useful for having multiple instances of the same parent block with different child shadows
         toolboxParentArgument?: string; // Used with toolboxParent. The name of the arg that this block should be inserted into as a shadow
+        duplicateWithToolboxParent?: string; // The ID of an additional block that will be created, which wraps this block in the toolbox. The original (unwrapped) block will also remain in the toolbox.
+        duplicateWithToolboxParentArgument?: string; // Used with duplicateWithToolboxParent. The name of the arg that this block should be inserted into as a shadow.
 
         // On namepspace
         subcategories?: string[];
@@ -1120,9 +1159,9 @@ declare namespace pxt.tutorial {
         assetFiles?: pxt.Map<string>;
         jres?: string; // JRES to be used when generating hints; necessary for tilemaps
         customTs?: string; // custom typescript code loaded in a separate file for the tutorial
-        tutorialValidationRules?: pxt.Map<boolean>; //a map of rules used in a tutorial and if the rules are activated
         globalBlockConfig?: TutorialBlockConfig; // concatenated `blockconfig.global` sections. Contains block configs applicable to all tutorial steps
         globalValidationConfig?: CodeValidationConfig; // concatenated 'validation.global' sections. Contains validation config applicable to all steps
+        simTheme?: Partial<pxt.PackageConfig>;
     }
 
     interface TutorialMetadata {
@@ -1136,16 +1175,6 @@ declare namespace pxt.tutorial {
         codeStop?: string; // command to run when code stops (MINECRAFT HOC ONLY)
         autoexpandOff?: boolean; // INTERNAL TESTING ONLY
         preferredEditor?: string; // preferred editor for opening the tutorial
-        tutorialCodeValidation?: boolean; // enable tutorial validation for this tutorial
-    }
-
-    interface TutorialRuleStatus {
-        ruleName: string;
-        ruleTurnOn: boolean;
-        ruleStatus?: boolean;
-        ruleMessage?: string;
-        isStrict?: boolean;
-        blockIds?: string[];
     }
 
     interface TutorialBlockConfigEntry {
@@ -1173,9 +1202,14 @@ declare namespace pxt.tutorial {
         execute(options: CodeValidationExecuteOptions): Promise<CodeValidationResult>;
     }
 
+    interface CodeValidatorBaseProperties {
+        enabled?: string;
+        markers?: string;
+    }
+
     interface CodeValidatorMetadata {
         validatorType: string;
-        properties: pxt.Map<string>;
+        properties: CodeValidatorBaseProperties;
     }
 
     interface CodeValidationConfig {
@@ -1193,10 +1227,6 @@ declare namespace pxt.tutorial {
         title?: string;
         activity?: number;
         contentMd?: string;
-
-        // Validation
-        requiredBlockMd?: string;
-        listOfValidationRules?: pxt.tutorial.TutorialRuleStatus[]; // Whether the user code has been marked valid for these set of rules
 
         // Old
         headerContentMd?: string;
@@ -1238,16 +1268,34 @@ declare namespace pxt.tutorial {
         assetFiles?: pxt.Map<string>;
         jres?: string; // JRES to be used when generating hints; necessary for tilemaps
         customTs?: string; // custom typescript code loaded in a separate file for the tutorial
-        tutorialValidationRules?: pxt.Map<boolean>; //a map of rules used in a tutorial and if the rules are activated
         templateLoaded?: boolean; // if the template code has been loaded once, we skip
         globalBlockConfig?: TutorialBlockConfig; // concatenated `blockconfig.global` sections. Contains block configs applicable to all tutorial steps
         globalValidationConfig?: CodeValidationConfig // concatenated 'validation.global' sections. Contains validation config applicable to all steps
+        simTheme?: Partial<pxt.PackageConfig>;
     }
     interface TutorialCompletionInfo {
         // id of the tutorial
         id: string;
         // number of steps completed
         steps: number;
+    }
+}
+
+declare namespace pxt.tour {
+    interface BubbleStep {
+        title: string;
+        description: string;
+        targetQuery: string;
+        location: BubbleLocation;
+        sansQuery?: string; // Use this to exclude an element from the cutout
+        sansLocation?: BubbleLocation; // relative location of element to exclude
+    }
+    const enum BubbleLocation {
+        Above,
+        Below,
+        Left,
+        Right,
+        Center
     }
 }
 

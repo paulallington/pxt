@@ -42,6 +42,12 @@ namespace pxt.editor {
         Expanded = "errorListExpanded"
     }
 
+    export enum MuteState {
+        Muted = "muted",
+        Unmuted = "unmuted",
+        Disabled = "disabled"
+    }
+
     export interface IAppProps { }
     export interface IAppState {
         active?: boolean; // is this tab visible at all
@@ -69,7 +75,7 @@ namespace pxt.editor {
         showParts?: boolean;
         fullscreen?: boolean;
         showMiniSim?: boolean;
-        mute?: boolean;
+        mute?: MuteState;
         embedSimView?: boolean;
         editorPosition?: {
             lineNumber: number;
@@ -95,6 +101,7 @@ namespace pxt.editor {
         screenshoting?: boolean;
         extensionsVisible?: boolean;
         isMultiplayerGame?: boolean; // Arcade: Does the current project contain multiplayer blocks?
+        onboarding?: pxt.tour.BubbleStep[];
     }
 
     export interface EditorState {
@@ -117,6 +124,8 @@ namespace pxt.editor {
         preferredEditor?: string; // preferred editor to open, pxt.BLOCKS_PROJECT_NAME, ...
         extensionUnderTest?: string; // workspace id of the extension under test
         skillmapProject?: boolean;
+        simTheme?: Partial<pxt.PackageConfig>;
+        firstProject?: boolean;
     }
 
     export interface ExampleImportOptions {
@@ -270,8 +279,7 @@ namespace pxt.editor {
         completeTutorialAsync(): Promise<void>;
         showTutorialHint(): void;
         isTutorial(): boolean;
-        onTutorialLoaded(): void;
-        setTutorialCodeStatus(step: number, status: pxt.tutorial.TutorialRuleStatus[]): void;
+        onEditorContentLoaded(): void;
         pokeUserActivity(): void;
         stopPokeUserActivity(): void;
         clearUserPoke(): void;
@@ -297,7 +305,7 @@ namespace pxt.editor {
         toggleTrace(intervalSpeed?: number): void;
         setTrace(enabled: boolean, intervalSpeed?: number): void;
         toggleMute(): void;
-        setMute(on: boolean): void;
+        setMute(state: MuteState): void;
         openInstructions(): void;
         closeFlyout(): void;
         printCode(): void;
@@ -349,13 +357,17 @@ namespace pxt.editor {
         startActivity(options: StartActivityOptions): void;
         showLightbox(): void;
         hideLightbox(): void;
+        showOnboarding(): void;
+        hideOnboarding(): void;
         showKeymap(show: boolean): void;
         toggleKeymap(): void;
+        signOutGithub(): void;
 
         showReportAbuse(): void;
         showLanguagePicker(): void;
         showShareDialog(title?: string, kind?: "multiplayer" | "vscode" | "share"): void;
         showAboutDialog(): void;
+        showTurnBackTimeDialogAsync(): Promise<void>;
 
         showLoginDialog(continuationHash?: string): void;
         showProfileDialog(location?: string): void;
@@ -372,7 +384,7 @@ namespace pxt.editor {
         showPackageDialog(query?: string): void;
         showBoardDialogAsync(features?: string[], closeIcon?: boolean): Promise<void>;
         checkForHwVariant(): boolean;
-        pairAsync(): Promise<void>;
+        pairAsync(): Promise<boolean>;
 
         createModalClasses(classes?: string): string;
         showModalDialogAsync(options: ModalDialogOptions): Promise<void>;

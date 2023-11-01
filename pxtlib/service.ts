@@ -259,6 +259,7 @@ namespace ts.pxtc {
         configData?: ConfigEntry[];
         sourceMap?: SourceInterval[];
         globalNames?: pxt.Map<SymbolInfo>;
+        builtVariants?: string[];
     }
 
     export interface Breakpoint extends LocationInfo {
@@ -763,8 +764,13 @@ namespace ts.pxtc {
                     updateBlockDef(fn.attributes);
                     const locps = pxt.blocks.compileInfo(fn);
                     if (!hasEquivalentParameters(ps, locps)) {
-                        pxt.log(`block has non matching arguments: ${oldBlock} vs ${fn.attributes.block}`);
-                        pxt.reportError(`loc.errors`, `invalid translations`, {
+                        pxt.reportError("loc.errors", "block has non matching arguments", {
+                            block: fn.attributes.blockId,
+                            lang: lang,
+                            originalDefinition: oldBlock,
+                            translatedBlock: fn.attributes.block,
+                        });
+                        pxt.tickEvent("loc.errors", {
                             block: fn.attributes.blockId,
                             lang: lang,
                         });
@@ -798,8 +804,9 @@ namespace ts.pxtc {
             const bParam = b.actualNameToParam[aParam.actualName];
             if (!bParam
                 || aParam.type != bParam.type
-                || aParam.shadowBlockId != bParam.shadowBlockId) {
-                pxt.debug(`Parameter ${aParam.actualName} type or shadow block does not match after localization`);
+                || aParam.shadowBlockId != bParam.shadowBlockId
+                || aParam.definitionName != bParam.definitionName) {
+                pxt.debug(`Parameter ${aParam.actualName} type, shadow block, or definition name does not match after localization`);
                 return false;
             }
         }

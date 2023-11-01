@@ -1,5 +1,37 @@
 # Microsoft MakeCode Blog
 
+## [MakeCode Minecraft 2023 Update](/blog/minecraft/2023-release)
+
+November 1st, 2023 by [Jaqster](https://github.com/jaqster)
+
+The MakeCode fall update for Minecraft is here! Here’s a run-down of all the new features and improvements...
+
+**[Continue reading this blog post](/blog/minecraft/2023-release)**
+
+## [MakeCode Clever Integration Released!](/blog/clever-release)
+
+September 6th, 2023 by [benvillalobos](https://github.com/benvillalobos)
+
+Just in time for the fall semester, MakeCode has integrated with [Clever](https://www.clever.com/)!
+
+**[Continue reading this blog post](/blog/clever-release)**
+
+## [MakeCode micro:bit 2023 Release!](/blog/microbit/2023-release)
+
+June 19th, 2023 by [Jaqster](https://github.com/jaqster)
+
+School’s out for many in the Northern Hemisphere, which means that it’s time again for our annual release! Here’s the list of new or updated features in this release.
+
+**[Continue reading this blog post](/blog/microbit/2023-release)**
+
+## [MakeCode Arcade Extension for Visual Studio Code](/blog/arcade/vscode-extension)
+
+March 24th, 2023 by [Jaqster](https://github.com/jaqster)
+
+What?! You heard that right. Now, for more experienced MakeCoders, you can take your MakeCode Arcade games to the next level with Visual Studio Code!
+
+**[Continue reading this blog post](/blog/arcade/vscode-extension)**
+
 ## [MakeCode Arcade 2023 Update](/blog/arcade/update-jan-2023)
 
 January 30th, 2023 by [Jaqster](https://github.com/jaqster)

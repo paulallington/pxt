@@ -225,6 +225,7 @@ export interface ProjectSettingsMenuState {
 }
 
 export class ProjectSettingsMenu extends data.Component<ProjectSettingsMenuProps, ProjectSettingsMenuState> {
+    dropdown: sui.DropdownMenu;
 
     constructor(props: ProjectSettingsMenuProps) {
         super(props);
@@ -245,6 +246,7 @@ export class ProjectSettingsMenu extends data.Component<ProjectSettingsMenuProps
 
     toggleHighContrast() {
         pxt.tickEvent("home.togglecontrast", undefined, { interactiveConsent: true });
+        this.hide();
         core.toggleHighContrast();
     }
 
@@ -275,12 +277,11 @@ export class ProjectSettingsMenu extends data.Component<ProjectSettingsMenuProps
 
     signOutGithub() {
         pxt.tickEvent("home.github.signout");
-        const githubProvider = cloudsync.githubProvider();
-        if (githubProvider) {
-            githubProvider.logout();
-            this.props.parent.forceUpdate();
-            core.infoNotification(lf("Signed out from GitHub"))
-        }
+        this.props.parent.signOutGithub();
+    }
+
+    hide() {
+        this.dropdown?.hide();
     }
 
     renderCore() {
@@ -292,7 +293,7 @@ export class ProjectSettingsMenu extends data.Component<ProjectSettingsMenuProps
         const reportAbuse = pxt.appTarget.cloud && pxt.appTarget.cloud.sharing && pxt.appTarget.cloud.importing;
         const showDivider = targetTheme.selectLanguage || targetTheme.highContrast || githubUser;
 
-        return <sui.DropdownMenu role="menuitem" icon={'setting large'} title={lf("More...")} className="item icon more-dropdown-menuitem">
+        return <sui.DropdownMenu role="menuitem" icon={'setting large'} title={lf("More...")} className="item icon more-dropdown-menuitem" ref={ref => this.dropdown = ref}>
             {targetTheme.selectLanguage && <sui.Item icon='xicon globe' role="menuitem" text={lf("Language")} onClick={this.showLanguagePicker} />}
             {targetTheme.highContrast && <sui.Item role="menuitem" text={highContrast ? lf("High Contrast Off") : lf("High Contrast On")} onClick={this.toggleHighContrast} />}
             {githubUser && <div className="ui divider"></div>}
@@ -300,7 +301,7 @@ export class ProjectSettingsMenu extends data.Component<ProjectSettingsMenuProps
                 <div className="avatar" role="presentation">
                     <img className="ui circular image" src={githubUser.photo} alt={lf("User picture")} />
                 </div>
-                {lf("Unlink GitHub")}
+                {lf("Disconnect GitHub")}
             </div>}
             {showDivider && <div className="ui divider"></div>}
             {reportAbuse ? <sui.Item role="menuitem" icon="warning circle" text={lf("Report Abuse...")} onClick={this.showReportAbuse} /> : undefined}
@@ -569,7 +570,6 @@ export class ProjectsCarousel extends data.Component<ProjectsCarouselProps, Proj
         this.closeDetail = this.closeDetail.bind(this);
         this.closeDetailOnEscape = this.closeDetailOnEscape.bind(this);
         this.reload = this.reload.bind(this);
-        this.newProject = this.newProject.bind(this);
         this.showScriptManager = this.showScriptManager.bind(this);
         this.handleCardClick = this.handleCardClick.bind(this);
     }
@@ -614,16 +614,16 @@ export class ProjectsCarousel extends data.Component<ProjectsCarouselProps, Proj
         return headers;
     }
 
-    newProject() {
+    newProject(firstProject?: boolean) {
         pxt.tickEvent("projects.new", undefined, { interactiveConsent: true });
         if (pxt.appTarget.appTheme.nameProjectFirst || pxt.appTarget.appTheme.chooseLanguageRestrictionOnNewProject) {
             this.props.parent.askForProjectCreationOptionsAsync()
                 .then(projectSettings => {
                     const { name, languageRestriction } = projectSettings
-                    this.props.parent.newProject({ name, languageRestriction });
+                    this.props.parent.newProject({ name, languageRestriction, firstProject });
                 })
         } else {
-            this.props.parent.newProject({});
+            this.props.parent.newProject({ firstProject });
         }
     }
 
@@ -754,9 +754,10 @@ export class ProjectsCarousel extends data.Component<ProjectsCarouselProps, Proj
             const headersToShow = headers
                 .filter(h => !h.tutorial?.metadata?.hideIteration)
                 .slice(0, ProjectsCarousel.NUM_PROJECTS_HOMESCREEN);
+            const isFirstProject = (!headers || headers?.length == 0);
             return <carousel.Carousel tickId="myprojects" bleedPercent={20}>
                 {showNewProject && <div role="button" className="ui card link buttoncard newprojectcard" title={lf("Creates a new empty project")}
-                    onClick={this.newProject} onKeyDown={fireClickOnEnter} >
+                    onClick={() => this.newProject(isFirstProject)} onKeyDown={fireClickOnEnter} >
                     <div className="content">
                         <sui.Icon icon="huge add circle" />
                         <span className="header">{lf("New Project")}</span>
@@ -1641,20 +1642,6 @@ export class ChooseHwDialog extends data.Component<ISettingsProps, ChooseHwDialo
         this.setState({ visible: true, skipDownload: !!skipDownload });
     }
 
-    fetchGallery(): pxt.CodeCard[] {
-        const path = "/hardware";
-        let res = this.getData(`gallery:${encodeURIComponent(path)}`) as pxt.gallery.Gallery[];
-        if (res) {
-            if (res instanceof Error) {
-                // ignore
-            } else {
-                this.prevGalleries = pxt.Util.concat(res.map(g => g.cards))
-                    .filter(c => !!c.variant);
-            }
-        }
-        return this.prevGalleries || [];
-    }
-
     private setHwVariant(cfg: pxt.PackageConfig, card: pxt.CodeCard) {
         pxt.tickEvent("projects.choosehwvariant", {
             hwid: cfg.name,
@@ -1681,17 +1668,19 @@ export class ChooseHwDialog extends data.Component<ISettingsProps, ChooseHwDialo
             const savedV = v
             v.card.onClick = () => this.setHwVariant(savedV, null)
         }
-        let cards = this.fetchGallery();
-        for (const card of cards) {
-            const savedV = variants.find(variant => variant.name == card.variant);
-            const savedCard = card;
-            if (savedV)
-                card.onClick = () => this.setHwVariant(savedV, savedCard);
-            else {
-                pxt.reportError("hw", "invalid variant");
+
+        const targetConfig = this.getData("target-config:") as pxt.TargetConfig;
+        const cards = targetConfig?.hardwareOptions?.map(el => {
+            const displayCard = { ...el };
+            const matchingVariant = variants.find(variant => variant.name === displayCard.variant);
+            if (!matchingVariant) {
+                // Variant may be experimental hw, ignore this option
+                return undefined;
             }
-        }
-        cards = cards.filter(card => !!card.onClick);
+
+            displayCard.onClick = () => this.setHwVariant(matchingVariant, displayCard);
+            return displayCard;
+        }).filter(el => !!el);
 
         return (
             <sui.Modal isOpen={visible} className="hardwaredialog" size="large"
@@ -1701,12 +1690,12 @@ export class ChooseHwDialog extends data.Component<ISettingsProps, ChooseHwDialo
             >
                 <div className="group">
                     <div className="ui cards centered" role="listbox">
-                        {cards.map(card =>
+                        {cards?.map(card =>
                             <codecard.CodeCardView
                                 key={'card' + card.name}
                                 name={card.name}
                                 ariaLabel={card.name}
-                                description={card.description}
+                                description={pxt.Util.rlf(`{id:hardware-description}${card.description}`)}
                                 imageUrl={card.imageUrl}
                                 learnMoreUrl={card.url}
                                 onClick={card.onClick}

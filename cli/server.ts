@@ -25,6 +25,12 @@ let packagedDir = ""
 let localHexCacheDir = path.join("built", "hexcache");
 let serveOptions: ServeOptions;
 
+const webappNames = [
+    "kiosk",
+    "multiplayer"
+    // TODO: Add other webapp names here: "skillmap", "authcode"
+];
+
 function setupDocfilesdirs() {
     docfilesdirs = [
         "docfiles",
@@ -304,7 +310,7 @@ async function handleApiStoreRequestAsync(req: http.IncomingMessage, res: http.S
                 res.end(val.toString());
             }
         } else {
-            res.writeHead(404);
+            res.writeHead(204);
             res.end();
         }
     } else if (meth === "POST") {
@@ -409,13 +415,14 @@ export function lookupDocFile(name: string) {
     return null
 }
 
-export function expandHtml(html: string, params?: pxt.Map<string>) {
-    let theme = U.flatClone(pxt.appTarget.appTheme)
+export function expandHtml(html: string, params?: pxt.Map<string>, appTheme?: pxt.AppTheme) {
+    let theme = U.flatClone(appTheme || pxt.appTarget.appTheme)
     html = expandDocTemplateCore(html)
     params = params || {};
     params["name"] = params["name"] || pxt.appTarget.appTheme.title;
     params["description"] = params["description"] || pxt.appTarget.appTheme.description;
     params["locale"] = params["locale"] || pxt.appTarget.appTheme.defaultLocale || "en"
+
 
     // page overrides
     let m = /<title>([^<>@]*)<\/title>/.exec(html)
@@ -801,6 +808,7 @@ export interface ServeOptions {
     hostname?: string;
     wsPort?: number;
     serial?: boolean;
+    noauth?: boolean;
 }
 
 // can use http://localhost:3232/streams/nnngzlzxslfu for testing
@@ -824,7 +832,7 @@ function certificateTestAsync(): Promise<string> {
 
 // use http://localhost:3232/45912-50568-62072-42379 for testing
 function scriptPageTestAsync(id: string) {
-    return Cloud.privateGetAsync(id)
+    return Cloud.privateGetAsync(pxt.Cloud.parseScriptId(id))
         .then((info: Cloud.JsonScript) => {
             // if running against old cloud, infer 'thumb' field
             // can be removed after new cloud deployment
@@ -853,7 +861,7 @@ function scriptPageTestAsync(id: string) {
                 filepath: "/" + id
             })
             return html
-        })
+        });
 }
 
 // use http://localhost:3232/pkg/microsoft/pxt-neopixel for testing
@@ -986,7 +994,8 @@ export function serveAsync(options: ServeOptions) {
             }
         }
 
-        let pathname = decodeURI(url.parse(req.url).pathname);
+        let uri = url.parse(req.url);
+        let pathname = decodeURI(uri.pathname);
         const opts: pxt.Map<string | string[]> = querystring.parse(url.parse(req.url).query);
         const htmlParams: pxt.Map<string> = {};
         if (opts["lang"] || opts["forcelang"])
@@ -1007,6 +1016,48 @@ export function serveAsync(options: ServeOptions) {
         let elts = pathname.split("/").filter(s => !!s)
         if (elts.some(s => s[0] == ".")) {
             return error(400, "Bad path :-(\n")
+        }
+
+        // Strip leading version number
+        if (elts.length && /^v\d+/.test(elts[0])) {
+            elts.shift();
+        }
+
+        // Rebuild pathname without leading version number
+        pathname = "/" + elts.join("/");
+
+        const expandWebappHtml = (appname: string, html: string) => {
+            // Expand templates
+            html = expandHtml(html);
+            // Rewrite application resource references
+            html = html.replace(/src="(\/static\/js\/[^"]*)"/, (m, f) => `src="/${appname}${f}"`);
+            html = html.replace(/src="(\/static\/css\/[^"]*)"/, (m, f) => `src="/${appname}${f}"`);
+            return html;
+        };
+
+        const serveWebappFile = (webappName: string, webappPath: string) => {
+            const webappUri = url.parse(`http://localhost:3000/${webappPath}${uri.search || ""}`);
+            http.get(webappUri, r => {
+                let body = "";
+                r.on("data", (chunk) => {
+                    body += chunk;
+                });
+                r.on("end", () => {
+                    if (!webappPath || webappPath === "index.html") {
+                        body = expandWebappHtml(webappName, body);
+                    }
+                    res.writeHead(200);
+                    res.write(body);
+                    res.end();
+                });
+            });
+        };
+
+        const webappIdx = webappNames.findIndex(s => new RegExp(`^-{0,3}${s}$`).test(elts[0] || ''));
+        if (webappIdx >= 0) {
+            const webappName = webappNames[webappIdx];
+            const webappPath = pathname.split("/").slice(2).join('/'); // remove /<webappName>/ from path
+            return serveWebappFile(webappName, webappPath);
         }
 
         if (elts[0] == "api") {
@@ -1039,7 +1090,7 @@ export function serveAsync(options: ServeOptions) {
                     })
             }
 
-            if (!isAuthorizedLocalRequest(req)) {
+            if (!options.noauth && !isAuthorizedLocalRequest(req)) {
                 error(403);
                 return null;
             }
@@ -1139,9 +1190,10 @@ export function serveAsync(options: ServeOptions) {
             return
         }
 
-        if (/^\/(\d\d\d\d[\d-]+)$/.test(pathname)) {
-            scriptPageTestAsync(pathname.slice(1))
+        if (!!pxt.Cloud.parseScriptId(pathname)) {
+            scriptPageTestAsync(pathname)
                 .then(sendHtml)
+                .catch(() => error(404, "Script not found"));
             return
         }
 
@@ -1169,7 +1221,7 @@ export function serveAsync(options: ServeOptions) {
         }
 
         let dd = dirs
-        let mm = /^\/(cdn|parts|sim|doccdn|blb)(\/.*)/.exec(pathname)
+        let mm = /^\/(cdn|parts|sim|doccdn|blb|trgblb)(\/.*)/.exec(pathname)
         if (mm) {
             pathname = mm[2]
         } else if (U.startsWith(pathname, "/docfiles/")) {

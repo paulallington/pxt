@@ -20,8 +20,10 @@ interface TutorialContainerProps {
     hideIteration?: boolean;
     hasTemplate?: boolean;
     preferredEditor?: string;
+    hasBeenResized?: boolean;
 
     tutorialOptions?: pxt.tutorial.TutorialOptions; // TODO (shakao) pass in only necessary subset
+    tutorialSimSidebar?: boolean;
 
     onTutorialStepChange?: (step: number) => void;
     onTutorialComplete?: () => void;
@@ -39,7 +41,6 @@ export function TutorialContainer(props: TutorialContainerProps) {
     const [ stepErrorAttemptCount, setStepErrorAttemptCount ] = React.useState(0);
     const [ hideModal, setHideModal ] = React.useState(false);
     const [ showScrollGradient, setShowScrollGradient ] = React.useState(false);
-    const [ layout, setLayout ] = React.useState<"vertical" | "horizontal">("vertical");
     const [ validationFailures, setValidationFailures ] = React.useState([]);
     const contentRef = React.useRef(undefined);
     const immReaderRef = React.useRef(undefined);
@@ -48,22 +49,28 @@ export function TutorialContainer(props: TutorialContainerProps) {
     const showNext = currentStep !== steps.length - 1;
     const showDone = !showNext && !pxt.appTarget.appTheme.lockedEditor && !hideIteration;
     const showImmersiveReader = pxt.appTarget.appTheme.immersiveReader;
-    const isHorizontal = layout === "horizontal";
+    const isHorizontal = props.tutorialSimSidebar || pxt.BrowserUtils.isTabletSize();
+
+    const containerRef = React.useRef<HTMLDivElement>();
+    const stepContentRef = React.useRef<HTMLDivElement>();
 
     React.useEffect(() => {
-        const observer = new ResizeObserver(() => {
-            if (pxt.BrowserUtils.isTabletSize()) {
-                setLayout("horizontal");
-            } else {
-                setLayout("vertical");
-            }
-            setShowScrollGradient(contentRef?.current?.scrollHeight > contentRef?.current?.offsetHeight);
-        });
+        const observer = new ResizeObserver(updateScrollGradient);
         observer.observe(document.body)
+
+        // We also want to update the scroll gradient if the tutorial wrapper is resized by the user.
+        if (containerRef.current) {
+            observer.observe(containerRef.current);
+        }
+
         return () => observer.disconnect();
     }, [document.body])
 
     React.useEffect(() => {
+        if (props.hasBeenResized) {
+            return;
+        }
+
         if (isHorizontal) {
             let scrollHeight = 0;
             const children = contentRef?.current?.children ? pxt.Util.toArray(contentRef?.current?.children) : [];
@@ -80,7 +87,7 @@ export function TutorialContainer(props: TutorialContainerProps) {
         } else {
             setParentHeight();
         }
-    })
+    }, [props.hasBeenResized, document.body])
 
     React.useEffect(() => {
         setCurrentStep(props.currentStep);
@@ -88,9 +95,9 @@ export function TutorialContainer(props: TutorialContainerProps) {
 
     React.useEffect(() => {
         const contentDiv = contentRef?.current;
+        if (stepContentRef.current) stepContentRef.current.focus();
         contentDiv.scrollTo(0, 0);
-        contentDiv.querySelector(".tutorial-step-content")?.focus();
-        setShowScrollGradient(contentDiv.scrollHeight > contentDiv.offsetHeight);
+        updateScrollGradient();
         setStepErrorAttemptCount(0);
 
         onTutorialStepChange(currentStep);
@@ -206,7 +213,7 @@ export function TutorialContainer(props: TutorialContainerProps) {
 
     const onModalClose = showNext ? () => tutorialStepNext() : () => setHideModal(true);
 
-    const tutorialContentScroll = () => {
+    const updateScrollGradient = () => {
         const contentDiv = contentRef?.current;
         setShowScrollGradient(contentDiv && ((contentDiv.scrollHeight - contentDiv.scrollTop - contentDiv.clientHeight) > 1));
     }
@@ -237,24 +244,30 @@ export function TutorialContainer(props: TutorialContainerProps) {
         currentStep={visibleStep}
         totalSteps={steps.length}
         title={name}
-        setTutorialStep={handleStepCounterSetStep} />;
+        isHorizontal={isHorizontal}
+        setTutorialStep={handleStepCounterSetStep}
+        onDone={onTutorialComplete} />;
     const hasHint = !!hintMarkdown;
 
+    const handleMarkedContentRef = (ref: HTMLDivElement) => {
+        stepContentRef.current = ref;
+    }
 
-    return <div className="tutorial-container">
+    return <div className="tutorial-container" ref={containerRef}>
         {!isHorizontal && stepCounter}
-        <div className={classList("tutorial-content", hasHint && "has-hint")} ref={contentRef} onScroll={tutorialContentScroll}>
+        <div className={classList("tutorial-content", hasHint && "has-hint")} ref={contentRef} onScroll={updateScrollGradient}>
             <div className={"tutorial-content-bkg"}>
-                {isHorizontal ? stepCounter : <div className="tutorial-step-label">
+                {!isHorizontal && <div className="tutorial-step-label">
                     {name && <span className="tutorial-step-title">{name}</span>}
                     <span className="tutorial-step-number">{lf("Step {0} of {1}", visibleStep + 1, steps.length)}</span>
                 </div>}
                 {showImmersiveReader && <ImmersiveReaderButton ref={immReaderRef} content={markdown} tutorialOptions={tutorialOptions} />}
                 {title && <div className="tutorial-title">{title}</div>}
-                <MarkedContent className="no-select tutorial-step-content" tabIndex={0} markdown={markdown} parent={parent}/>
+                <MarkedContent className="no-select tutorial-step-content" tabIndex={0} markdown={markdown} parent={parent} contentRef={handleMarkedContentRef}/>
                 <div className="tutorial-controls">
                     {hasHint && <TutorialHint tutorialId={tutorialId} currentStep={visibleStep} markdown={hintMarkdown} parent={parent} />}
-                    { nextButton }
+                    {isHorizontal && stepCounter}
+                    {!isHorizontal && nextButton}
                 </div>
             </div>
         </div>

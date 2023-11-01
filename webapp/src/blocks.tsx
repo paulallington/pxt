@@ -221,9 +221,7 @@ export class Editor extends toolboxeditor.ToolboxEditor {
                     this.loadingXmlPromise = null;
                     pxt.perf.measureEnd("domUpdate loadBlockly")
                     // Do Not Remove: This is used by the skillmap
-                    if (this.parent.isTutorial()) {
-                        this.parent.onTutorialLoaded();
-                    }
+                    this.parent.onEditorContentLoaded();
                 });
         }
     }
@@ -485,7 +483,19 @@ export class Editor extends toolboxeditor.ToolboxEditor {
 
         const oldAudioPlay = (Blockly as any).WorkspaceAudio.prototype.play;
         (Blockly as any).WorkspaceAudio.prototype.play = function (name: string, opt_volume?: number) {
-            if (editor && editor.parent.state.mute) opt_volume = 0;
+            const themeVolume = pxt.appTarget?.appTheme?.blocklySoundVolume;
+
+            if (editor?.parent.state.mute === pxt.editor.MuteState.Muted) {
+                opt_volume = 0;
+            }
+            else if (themeVolume != undefined) {
+                if (opt_volume != undefined) {
+                    opt_volume *= themeVolume;
+                }
+                else {
+                    opt_volume = themeVolume;
+                }
+            }
             oldAudioPlay.call(this, name, opt_volume);
         };
     }
@@ -798,14 +808,6 @@ export class Editor extends toolboxeditor.ToolboxEditor {
         for (let listener of pxt.U.values(this.errorChangesListeners)) {
             listener(errors)
         }
-    }
-
-    async validateTutorialCode(tutorial: pxt.tutorial.TutorialOptions) {
-        // Current tutorial step
-        const { tutorialStep } = tutorial;
-        const blocks = this.editor.getAllBlocks(false);
-        const tutorialRulesValidated: pxt.tutorial.TutorialRuleStatus[] = await pxt.tutorial.validate(tutorial, blocks, this.blockInfo);
-        this.parent.setTutorialCodeStatus(tutorialStep, tutorialRulesValidated);
     }
 
     getBlocksAreaDiv() {
@@ -1151,6 +1153,7 @@ export class Editor extends toolboxeditor.ToolboxEditor {
         const hasCategories = (forceHasCategories != undefined) ? forceHasCategories :
             (blocklyOptions.hasCategories != undefined ? blocklyOptions.hasCategories :
                 this.showCategories);
+
         blocklyOptions.hasCategories = hasCategories;
         blocklyOptions.renderer = "pxt";
         if (!hasCategories) this.showCategories = false;
@@ -1857,6 +1860,10 @@ export class Editor extends toolboxeditor.ToolboxEditor {
                             setblock.appendChild(value);
                         }
                         blockXml = setblock;
+                    } else if(fn.attributes.duplicateWithToolboxParent) {
+                        const blockWithParentFn = {...fn, attributes: {...fn.attributes, toolboxParent: fn.attributes.duplicateWithToolboxParent, toolboxParentArgument: fn.attributes.duplicateWithToolboxParentArgument}};
+                        const duplicatedBlock = pxt.blocks.createToolboxBlock(this.blockInfo, blockWithParentFn, comp);
+                        return [duplicatedBlock, blockXml];
                     }
                 }
             } else {

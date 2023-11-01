@@ -1,6 +1,6 @@
 {
   "name": "pxt-core",
-  "version": "8.6.12",
+  "version": "9.3.2",
   "description": "Microsoft MakeCode provides Blocks / JavaScript / Python tools and editors",
   "keywords": [
     "TypeScript",
@@ -40,6 +40,8 @@
     "built/web/authcode/js/*.js",
     "built/web/multiplayer/css/*.css",
     "built/web/multiplayer/js/*.js",
+    "built/web/kiosk/css/*.css",
+    "built/web/kiosk/js/*.js",
     "pxtcompiler/ext-typescript/lib/lib.d.ts",
     "pxtcompiler/ext-typescript/lib/typescript.js",
     "pxtcompiler/ext-typescript/lib/typescriptServices.d.ts",
@@ -65,14 +67,16 @@
     "@blockly/keyboard-navigation": "^0.1.18",
     "@blockly/plugin-workspace-search": "^4.0.10",
     "@fortawesome/fontawesome-free": "^5.15.4",
+    "@microsoft/applicationinsights-web": "^2.8.11",
     "@microsoft/immersive-reader-sdk": "1.1.0",
+    "@types/diff-match-patch": "^1.0.32",
     "@zip.js/zip.js": "2.4.20",
-    "applicationinsights-js": "^1.0.20",
     "browserify": "16.2.3",
     "build": "^0.1.4",
     "chai": "^3.5.0",
     "cssnano": "4.1.10",
     "dashjs": "^4.4.0",
+    "diff-match-patch": "^1.0.5",
     "dompurify": "2.0.17",
     "faye-websocket": "0.11.1",
     "karma": "6.3.10",
@@ -161,6 +165,6 @@
     "test:lang": "gulp testlang",
     "update": "gulp update",
     "watch-streamer": "cd docs/static/streamer && tsc -t es6 --watch",
-    "prepare": "cd skillmap && npm install && cd .. && cd authcode && npm install && cd .. && cd multiplayer && npm install && cd .."
+    "prepare": "cd skillmap && npm install && cd .. && cd authcode && npm install && cd .. && cd multiplayer && npm install && cd .. && cd kiosk && npm install && cd .."
   }
 }
