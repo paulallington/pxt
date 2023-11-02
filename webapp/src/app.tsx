@@ -1160,14 +1160,13 @@ export class ProjectView
             return undefined;
         }
 
-        const simulatorOnly = pxt.BrowserUtils.SimulatorOnlyCheck();
+        const simulatorOnly = true;
 
         if (simulatorOnly){
-            this.openSimView();
             document.getElementById("mainmenu").style.display = 'none';
             document.getElementById("editortools").style.display = 'none';
-            document.getElementById("sandboxfooter").style.display = 'none';
             document.getElementById("simtoolbar").style.display = 'none';
+            this.openSimView();
         }
 
         let simRunning = false;
