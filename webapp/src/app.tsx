@@ -1160,7 +1160,7 @@ export class ProjectView
             return undefined;
         }
 
-        const simulatorOnly = true;
+        const simulatorOnly = pxt.BrowserUtils.SimulatorOnlyCheck();
 
         if (simulatorOnly){
             document.getElementById("mainmenu").style.display = 'none';
