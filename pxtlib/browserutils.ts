@@ -38,6 +38,14 @@ namespace pxt.BrowserUtils {
         return null;
     }
 
+    export function projectId() : string {
+        let urlQuery = Util.parseQueryString(window.location.href);
+        if (urlQuery["pid"]){
+            return urlQuery["pid"];
+        }
+        return null;
+    }
+
     export async function putGhToken(ghToken: string) {
         const tczApi = pxt.appTarget.appTheme.tczApi ? pxt.appTarget.appTheme.tczApiDomain : "http://localhost:8080";
 

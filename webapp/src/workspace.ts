@@ -64,7 +64,6 @@ export function copyProjectToLegacyEditor(header: Header, majorVersion: number):
 export function setupWorkspace(id: string) {
     U.assert(!impl, "workspace set twice");
     pxt.log(`workspace: ${id}`);
-    console.log(`workspace: ${id}`);
     implType = id ?? "browser";
     switch (id) {
         case "fs":
@@ -559,7 +558,6 @@ export async function saveAsync(h: Header, text?: ScriptText, fromCloudSync?: bo
     }
 
     const hasUserFileChanges = () => {
-        console.log("User changes detected")
         // we see lots of frequent "saves" that don't come from real changes made by the user. This
         // causes problems for cloud sync since this can cause us to think the user is making when
         // just reading a project. The "correct" solution would be to have a full history and .gitignore
@@ -651,7 +649,6 @@ export async function saveAsync(h: Header, text?: ScriptText, fromCloudSync?: bo
     }
 
     return headerQ.enqueue<void>(h.id, async () => {
-        console.log("Sending save to storage")
         await fixupVersionAsync(e);
         let ver: any;
 

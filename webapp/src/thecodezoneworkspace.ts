@@ -5,7 +5,8 @@ type WorkspaceProvider = pxt.workspace.WorkspaceProvider;
 import U = pxt.Util;
 
 export let projects: pxt.Map<Project> = {};
-const projectId = U.parseQueryString(window.location.href)["pid"];
+const projectId: string = pxt.BrowserUtils.projectId();
+const autoSaveEnabled: boolean = pxt.BrowserUtils.autoSaveEnabled();
 
 export function merge(prj: Project) {
     let h: Header = prj.header;
@@ -20,7 +21,6 @@ export function merge(prj: Project) {
 
 async function listAsync(): Promise<Header[]> {
     let p = await getProjectAsync();
-    console.log("listAsync", projectId, p);
     return Promise.resolve([p.header]);
 }
 
@@ -44,14 +44,10 @@ async function getAsync(h: Header): Promise<pxt.workspace.File> {
 }
 
 async function setAsync(h: Header, prevVer: any, text?: ScriptText) {
-    let autoSaveEnabled = pxt.BrowserUtils.autoSaveEnabled();
-
     if (!autoSaveEnabled){
         console.log("Auto Save Disabled")
         return Promise.resolve()
     }
-
-    console.log("setAsync in cz", h, prevVer, text);
 
     if (text) {
         let obj = {
@@ -64,7 +60,7 @@ async function setAsync(h: Header, prevVer: any, text?: ScriptText) {
             method: "POST",
             withCredentials: true,
             data: obj
-        }).then((resp) => { console.log("RESPONSE", resp); });
+        })
     }
     return Promise.resolve()
 }
