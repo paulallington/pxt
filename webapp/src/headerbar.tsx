@@ -11,10 +11,13 @@ import * as identity from "./identity";
 import * as pkg from "./package";
 import * as projects from "./projects";
 import * as tutorial from "./tutorial";
+import * as workspace from "./workspace";
 
 type ISettingsProps = pxt.editor.ISettingsProps;
 type HeaderBarView = "home" | "editor" | "tutorial" | "tutorial-tab" | "debugging" | "sandbox" | "time-machine";
 const LONGPRESS_DURATION = 750;
+const isAdmin = pxt.BrowserUtils.checkIfAdmin();
+const isMasterProject: boolean = pxt.BrowserUtils.isMasterProject();
 
 export class HeaderBar extends data.Component<ISettingsProps, {}> {
     protected longpressTimer: any;
@@ -27,6 +30,12 @@ export class HeaderBar extends data.Component<ISettingsProps, {}> {
     goHome = () => {
         pxt.tickEvent("menu.home", undefined, { interactiveConsent: true });
         if (this.getView() !== "home") this.props.parent.showExitAndSaveDialog();
+    }
+
+    async saveProjectToApi() {
+        let header = pkg.mainEditorPkg().header
+        const text = await workspace.getTextAsync(header.id);
+        await workspace.saveAsync(header, text, false, true);
     }
 
     showShareDialog = () => {
@@ -245,6 +254,7 @@ export class HeaderBar extends data.Component<ISettingsProps, {}> {
         const showHomeButton = (view === "editor" || view === "tutorial-tab") && !targetTheme.lockedEditor && !isController;
         const showShareButton = (view === "editor" || view === "tutorial-tab") && header && pxt.appTarget.cloud?.showSharingButton && !isController;
         const showHelpButton = view === "editor" && targetTheme.docMenu?.length;
+        const showSaveButton= isAdmin && isMasterProject;
 
         // Approximate each tutorial step to be 22 px
         const manyTutorialSteps = view == "tutorial" && (tutorialOptions.tutorialStepInfo.length * 22 > window.innerWidth / 3);
@@ -267,6 +277,7 @@ export class HeaderBar extends data.Component<ISettingsProps, {}> {
                 {showHomeButton && <sui.Item className={`icon openproject ${hasIdentity ? "mobile hide" : ""}`} role="menuitem" title={lf("Home")} icon="home large" ariaLabel={lf("Home screen")} onClick={this.goHome} />}
                 {showShareButton && <sui.Item className="icon shareproject mobile hide" role="menuitem" title={lf("Publish your game to create a shareable link")} icon="share alternate large" ariaLabel={lf("Share Project")} onClick={this.showShareDialog} />}
                 {showHelpButton && <container.DocsMenu parent={this.props.parent} editor={activeEditor} />}
+                {showSaveButton && <sui.Item className="icon save mobile hide" role="menuitem" title={lf("Save Project")} icon="save alternate large" ariaLabel={lf("Save Project")} onClick={this.saveProjectToApi} />}
                 {this.getSettingsMenu(view)}
                 {hasIdentity && (view === "home" || view === "editor" || view === "tutorial-tab") && <identity.UserMenu parent={this.props.parent} />}
             </div>

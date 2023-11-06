@@ -535,7 +535,7 @@ export async function partialSaveAsync(id: string, filename: string, content: st
     return saveAsync(prev.header, newTxt);
 }
 
-export async function saveAsync(h: Header, text?: ScriptText, fromCloudSync?: boolean): Promise<void> {
+export async function saveAsync(h: Header, text?: ScriptText, fromCloudSync?: boolean, forceSave?: boolean): Promise<void> {
     pxt.debug(`workspace.saveAsync ${dbgHdrToString(h)}`)
     if (h.isDeleted)
         clearHeaderSession(h);
@@ -584,25 +584,6 @@ export async function saveAsync(h: Header, text?: ScriptText, fromCloudSync?: bo
 
         return hasUserChanges;
     }
-
-    // // Check for undefined in save object as that means there may be a corruption
-    // const corruptionDetected = () => {
-    //     console.log("Data to validate")
-    //     console.log(text)
-    //
-    //     for (let key in text) {
-    //         if (key == "undefined") {
-    //             console.log(`Corruption detected in key: ${key}`);
-    //             return true;
-    //         }
-    //     }
-    //
-    //     return false
-    // }
-    //
-    // if (corruptionDetected()){
-    //     return Promise.resolve()
-    // }
 
     const isHeaderOnlyChange = !fromCloudSync && !text;
     const isUserChange = !fromCloudSync
@@ -678,7 +659,11 @@ export async function saveAsync(h: Header, text?: ScriptText, fromCloudSync?: bo
 
 
         try {
-            ver = await impl.setAsync(h, e.version, toWrite);
+            if (forceSave){
+                ver = await impl.setAsync(h, e.version, toWrite, forceSave);
+            }else{
+                ver = await impl.setAsync(h, e.version, toWrite);
+            }
         } catch (e) {
             // Write failed; use in memory db.
             await switchToMemoryWorkspace("write failed");

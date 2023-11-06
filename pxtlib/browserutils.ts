@@ -101,6 +101,14 @@ namespace pxt.BrowserUtils {
         return false;
     }
 
+    export function isMasterProject() {
+        let urlQuery = Util.parseQueryString(window.location.href);
+        if (urlQuery["isMasterProject"]){
+            return true;
+        }
+        return false;
+    }
+
     export function renderBlocksCheck() {
         let urlQuery = Util.parseQueryString(window.location.href);
         if (urlQuery["hideBlocks"]){
