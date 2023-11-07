@@ -3,6 +3,7 @@
 import * as React from "react";
 import * as data from "./data";
 import * as sui from "./sui";
+import * as core from "./core";
 
 import * as auth from "./auth";
 import * as cmds from "./cmds"
@@ -12,6 +13,7 @@ import * as pkg from "./package";
 import * as projects from "./projects";
 import * as tutorial from "./tutorial";
 import * as workspace from "./workspace";
+import {infoNotification} from "./core";
 
 type ISettingsProps = pxt.editor.ISettingsProps;
 type HeaderBarView = "home" | "editor" | "tutorial" | "tutorial-tab" | "debugging" | "sandbox" | "time-machine";
@@ -36,6 +38,7 @@ export class HeaderBar extends data.Component<ISettingsProps, {}> {
         let header = pkg.mainEditorPkg().header
         const text = await workspace.getTextAsync(header.id);
         await workspace.saveAsync(header, text, false, true);
+        core.infoNotification(lf("Project Saved"))
     }
 
     showShareDialog = () => {

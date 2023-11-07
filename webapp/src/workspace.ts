@@ -248,13 +248,14 @@ export function isHeaderSessionOutdated(h: Header): boolean {
     return sid && sid != workspaceID;
 }
 function checkHeaderSession(h: Header): void {
-    if (isHeaderSessionOutdated(h)) {
-        pxt.tickEvent(`workspace.conflict.header`);
-        core.errorNotification(lf("This project is already opened elsewhere."))
-        pxt.debug(`saved session ID: ${pxt.storage.getLocal('workspaceheadersessionid:' + h.id)}`)
-        pxt.debug(`our session ID: ${workspaceID}`)
-        pxt.Util.assert(false, "trying to access outdated session")
-    }
+    return;
+    // if (isHeaderSessionOutdated(h)) {
+    //     pxt.tickEvent(`workspace.conflict.header`);
+    //     core.errorNotification(lf("This project is already opened elsewhere."))
+    //     pxt.debug(`saved session ID: ${pxt.storage.getLocal('workspaceheadersessionid:' + h.id)}`)
+    //     pxt.debug(`our session ID: ${workspaceID}`)
+    //     pxt.Util.assert(false, "trying to access outdated session")
+    // }
 }
 // helps know when we last synced with the cloud (in seconds since epoch)
 export function getHeaderLastCloudSync(h: Header): number {
