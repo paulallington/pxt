@@ -1,37 +1,90 @@
 import * as React from "react";
-
+import { useContext } from "react";
+import css from "./styling/HeaderBar.module.scss";
 import { Button } from "react-common/components/controls/Button";
 import { MenuBar } from "react-common/components/controls/MenuBar";
+import { AppStateContext } from "../state/appStateContext";
+import { getSafeRubricName } from "../state/helpers";
+import { Ticks } from "../constants";
 
-interface HeaderBarProps {
-}
+interface HeaderBarProps {}
 
-export class HeaderBar extends React.Component<HeaderBarProps> {
-    protected reportAbuseUrl = "https://github.com/contact/report-content";
+export const HeaderBar: React.FC<HeaderBarProps> = () => {
+    const { state: teacherTool } = useContext(AppStateContext);
 
-    protected getOrganizationLogo(targetTheme: pxt.AppTheme) {
-        const logoUrl = targetTheme.organizationWideLogo;
-        return <div className="header-logo">
-            {logoUrl
-                ? <img src={logoUrl} alt={lf("{0} Logo", targetTheme.organization)}/>
-                : <span className="name">{targetTheme.organization}</span>}
-        </div>
-    }
+    const appTheme = pxt.appTarget?.appTheme;
 
-    protected getTargetLogo(targetTheme: pxt.AppTheme) {
-        return <div className={`ui item logo brand noclick}`}>
-            {targetTheme.useTextLogo
-                ? [<span className="name" key="org-name" onClick={this.onHomeClicked}>{targetTheme.organizationText}</span>,
-                   <span className="name-short" key="org-name-short" onClick={this.onHomeClicked}>{targetTheme.organizationShortText || targetTheme.organizationText}</span>]
-                : (targetTheme.logo || targetTheme.portraitLogo
-                    ? <img className="logo" src={targetTheme.logo || targetTheme.portraitLogo} alt={lf("{0} Logo", targetTheme.boardName)}/>
-                    : <span className="name"> {targetTheme.boardName}</span>)
-            }
-        </div>
-    }
+    const onBrandIconClick = () => {
+        pxt.tickEvent(Ticks.BrandLink);
+        if (appTheme?.logoUrl) {
+            window.open(appTheme.logoUrl);
+        }
+    };
 
-    onHomeClicked = () => {
-        pxt.tickEvent("teacherTool.home");
+    const onOrgClick = () => {
+        pxt.tickEvent(Ticks.OrgLink);
+        if (appTheme?.organizationUrl) {
+            window.open(appTheme.organizationUrl);
+        }
+    };
+
+    const getOrganizationLogo = () => {
+        return (
+            <div className={css["org"]} onClick={onOrgClick}>
+                {appTheme.organizationWideLogo || appTheme.organizationLogo ? (
+                    <img
+                        className={css["logo"]}
+                        src={appTheme.organizationWideLogo || appTheme.organizationLogo}
+                        alt={lf("{0} Logo", appTheme.organization)}
+                    />
+                ) : (
+                    <span className="name">{appTheme.organization}</span>
+                )}
+            </div>
+        );
+    };
+
+    const getTargetLogo = () => {
+        return (
+            <div
+                className={css["brand"]}
+                aria-label={lf("{0} Logo", appTheme.boardName)}
+                role="menuitem"
+                onClick={onBrandIconClick}
+            >
+                {appTheme.useTextLogo ? (
+                    [
+                        <span className={css["name"]} key="org-name">
+                            {appTheme.organizationText}
+                        </span>,
+                        <span className={css["name-short"]} key="org-name-short">
+                            {appTheme.organizationShortText || appTheme.organizationText}
+                        </span>,
+                    ]
+                ) : appTheme.logo || appTheme.portraitLogo ? (
+                    <img
+                        className={css["logo"]}
+                        src={appTheme.logo || appTheme.portraitLogo}
+                        alt={lf("{0} Logo", appTheme.boardName)}
+                    />
+                ) : (
+                    <span className={css["name"]}>{appTheme.boardName}</span>
+                )}
+            </div>
+        );
+    };
+
+    const getRubricName = (): JSX.Element | null => {
+        const rubricName = getSafeRubricName(teacherTool);
+        return rubricName ? (
+            <div className={css["rubric-name"]}>
+                <span>{rubricName}</span>
+            </div>
+        ) : null;
+    };
+
+    const onHomeClicked = () => {
+        pxt.tickEvent(Ticks.HomeLink);
 
         // relprefix looks like "/beta---", need to chop off the hyphens and slash
         let rel = pxt.webConfig?.relprefix.substr(0, pxt.webConfig.relprefix.length - 3);
@@ -40,30 +93,27 @@ export class HeaderBar extends React.Component<HeaderBarProps> {
                 rel = rel.substr(1);
             }
             window.open(pxt.appTarget.appTheme.homeUrl + rel);
-        }
-        else {
+        } else {
             window.open(pxt.appTarget.appTheme.homeUrl);
         }
-    }
+    };
 
-    render() {
-        const hasIdentity = pxt.auth.hasIdentity();
-
-        const appTheme = pxt.appTarget?.appTheme;
-
-        return <MenuBar className="header" ariaLabel={lf("Header")}>
-            <div className="header-left">
-                {this.getOrganizationLogo(appTheme)}
-                {this.getTargetLogo(appTheme)}
+    return (
+        <MenuBar className={css["header"]} ariaLabel={lf("Header")} role="navigation">
+            <div className={css["left-menu"]}>
+                {getOrganizationLogo()}
+                {getTargetLogo()}
+                {getRubricName()}
             </div>
 
-            <div className="spacer" />
-
-            <div className="header-right">
-                <Button className="menu-button" leftIcon="fas fa-home large" title={lf("Return to the editor homepage")} onClick={this.onHomeClicked}/>
+            <div className={css["right-menu"]}>
+                <Button
+                    className="menu-button"
+                    leftIcon="fas fa-home large"
+                    title={lf("Open the MakeCode editor")}
+                    onClick={onHomeClicked}
+                />
             </div>
         </MenuBar>
-    }
-}
-
-export default HeaderBar;
+    );
+};

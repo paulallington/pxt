@@ -5,17 +5,15 @@ import * as data from "./data";
 import * as sui from "./sui";
 import * as githubbutton from "./githubbutton";
 import * as cmds from "./cmds"
-import * as cloud from "./cloud";
-import * as auth from "./auth";
 import * as identity from "./identity";
 import { ProjectView } from "./app";
-import { clearDontShowDownloadDialogFlag } from "./dialogs";
 import { userPrefersDownloadFlagSet } from "./webusb";
 import { dialogAsync, hideDialog } from "./core";
 
 import Util = pxt.Util;
+import ISettingsProps = pxt.editor.ISettingsProps;
+import SimState = pxt.editor.SimState;
 
-type ISettingsProps = pxt.editor.ISettingsProps;
 
 const enum View {
     Computer,
@@ -380,8 +378,8 @@ export class EditorToolbar extends data.Component<ISettingsProps, EditorToolbarS
         const compileBtn = compile.hasHex || compile.saveAsPNG || compile.useUF2;
         const compileTooltip = lf("Download your code to the {0}", targetTheme.boardName);
         const compileLoading = !!compiling;
-        const running = simState == pxt.editor.SimState.Running;
-        const starting = simState == pxt.editor.SimState.Starting;
+        const running = simState == SimState.Running;
+        const starting = simState == SimState.Starting;
 
         const showUndoRedo = !readOnly && !debugging && !flyoutOnly;
         const showZoomControls = !flyoutOnly;
@@ -395,10 +393,10 @@ export class EditorToolbar extends data.Component<ISettingsProps, EditorToolbarS
 
         const bigRunButtonTooltip = (() => {
             switch (simState) {
-                case pxt.editor.SimState.Stopped:
+                case SimState.Stopped:
                     return lf("Start");
-                case pxt.editor.SimState.Pending:
-                case pxt.editor.SimState.Starting:
+                case SimState.Pending:
+                case SimState.Starting:
                     return lf("Starting");
                 default:
                     return lf("Stop");

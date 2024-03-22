@@ -741,9 +741,6 @@ namespace pxt.BrowserUtils {
         if (!loadBlocklyPromise) {
             pxt.debug(`blockly: delay load`);
             let p = pxt.BrowserUtils.loadStyleAsync("blockly.css", ts.pxtc.Util.isUserLanguageRtl());
-            // js not loaded yet?
-            if (typeof Blockly === "undefined")
-                p = p.then(() => pxt.BrowserUtils.loadScriptAsync("pxtblockly.js"));
             p = p.then(() => {
                 pxt.debug(`blockly: loaded`)
             });
@@ -939,7 +936,8 @@ namespace pxt.BrowserUtils {
             private name: string,
             private version: number,
             private upgradeHandler?: IDBUpgradeHandler,
-            private quotaExceededHandler?: () => void) {
+            private quotaExceededHandler?: () => void,
+            private skipErrorLog = false) {
         }
 
         private throwIfNotOpened(): void {
@@ -949,6 +947,10 @@ namespace pxt.BrowserUtils {
         }
 
         private errorHandler(err: Error, op: string, reject: (err: Error) => void): void {
+            if (this.skipErrorLog) {
+                reject(err);
+                return;
+            }
             console.error(new Error(`${this.name} IDBWrapper error for ${op}: ${err.message}`));
             reject(err);
             // special case for quota exceeded
@@ -1048,6 +1050,34 @@ namespace pxt.BrowserUtils {
                 request.onsuccess = () => resolve();
                 request.onerror = () => this.errorHandler(request.error, "deleteAll", reject);
             });
+        }
+
+        public getObjectStoreWrapper<T>(storeName: string): IDBObjectStoreWrapper<T> {
+            return new IDBObjectStoreWrapper(this, storeName);
+        }
+    }
+
+    export class IDBObjectStoreWrapper<T> {
+        constructor(protected db: IDBWrapper, protected storeName: string) {}
+
+        public getAsync(id: string): Promise<T> {
+            return this.db.getAsync(this.storeName, id);
+        }
+
+        public getAllAsync(): Promise<T[]> {
+            return this.db.getAllAsync(this.storeName);
+        }
+
+        public setAsync(data: T): Promise<void> {
+            return this.db.setAsync(this.storeName, data);
+        }
+
+        public async deleteAsync(id: string): Promise<void> {
+            await this.db.deleteAsync(this.storeName, id);
+        }
+
+        public async deleteAllAsync(): Promise<void> {
+            await this.db.deleteAllAsync(this.storeName);
         }
     }
 
@@ -1493,6 +1523,26 @@ namespace pxt.BrowserUtils {
             return !!success;
         } catch (e) {
             return false;
+        }
+    }
+
+    /**
+     * Sets the theme of the application by adding a class to the body. Themes
+     * are defined in CSS variable packs. The default theme is defined in
+     * `themes/themepacks.less`, in the `:root` pseudoclass. `highcontrast` is
+     * also defined there. Target-specific themes are defined in the target
+     * repo's `theme/themepack.less`.
+     */
+    export function setApplicationTheme(theme: string | undefined) {
+        const body = document.body;
+        const classes = body.classList;
+        for (let i = 0; i < classes.length; i++) {
+            if (/^theme-/.test(classes[i])) {
+                body.classList.remove(classes[i]);
+            }
+        }
+        if (theme) {
+            body.classList.add(`theme-${theme}`);
         }
     }
 }

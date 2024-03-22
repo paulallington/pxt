@@ -4,6 +4,8 @@ import * as data from "./data";
 import * as workspace from "./workspace";
 import * as app from "./app";
 
+import * as pxteditor from "../../pxteditor";
+
 type File = pxt.workspace.File;
 type Header = pxt.workspace.Header;
 type ScriptText = pxt.workspace.ScriptText;
@@ -562,13 +564,22 @@ export async function requestProjectCloudStatus(headerIds: string[]): Promise<vo
     for (const id of headerIds) {
         const cloudMd = getCloudTempMetadata(id);
         const cloudStatus = cloudMd.cloudStatus();
+
         const msg: pxt.editor.EditorMessageProjectCloudStatus = {
-            type: "pxteditor",
+            type: "pxthost",
             action: "projectcloudstatus",
             headerId: cloudMd.headerId,
             status: cloudStatus.value
         };
-        pxt.editor.postHostMessageAsync(msg);
+        pxteditor.postHostMessageAsync(msg);
+
+        // Deprecated: This was originally fired with the "pxteditor"
+        // type, which should only be used for responses, not events.
+        // Use the pxthost version above instead
+        pxteditor.postHostMessageAsync({
+            ...msg,
+            type: "pxteditor"
+        });
     }
 }
 

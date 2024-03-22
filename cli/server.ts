@@ -6,8 +6,8 @@ import * as querystring from 'querystring';
 import * as nodeutil from './nodeutil';
 import * as hid from './hid';
 import * as net from 'net';
-import * as crowdin from './crowdin';
 import * as storage from './storage';
+import { SUB_WEBAPPS } from './subwebapp';
 
 import { promisify } from "util";
 
@@ -24,13 +24,6 @@ let docsDir = ""
 let packagedDir = ""
 let localHexCacheDir = path.join("built", "hexcache");
 let serveOptions: ServeOptions;
-
-const webappNames = [
-    "kiosk",
-    "multiplayer",
-    "eval"
-    // TODO: Add other webapp names here: "skillmap", "authcode"
-];
 
 function setupDocfilesdirs() {
     docfilesdirs = [
@@ -1037,22 +1030,43 @@ export function serveAsync(options: ServeOptions) {
         };
 
         const serveWebappFile = (webappName: string, webappPath: string) => {
-            const webappUri = url.parse(`http://localhost:3000/${webappPath}${uri.search || ""}`);
-            http.get(webappUri, r => {
+            const webappUri = url.parse(`http://127.0.0.1:3000/${webappPath}${uri.search || ""}`);
+            const request = http.get(webappUri, r => {
                 let body = "";
                 r.on("data", (chunk) => {
                     body += chunk;
                 });
                 r.on("end", () => {
+                    if (body.includes("<title>Error</title>")) { // CRA development server returns this for missing files
+                        res.writeHead(404, {
+                            'Content-Type': 'text/html; charset=utf8',
+                        });
+                        res.write(body);
+                        return res.end();
+                    }
                     if (!webappPath || webappPath === "index.html") {
                         body = expandWebappHtml(webappName, body);
                     }
-                    res.writeHead(200);
+                    if (webappPath) {
+                        res.writeHead(200, {
+                            'Content-Type': U.getMime(webappPath),
+                        });
+                    } else {
+                        res.writeHead(200, {
+                            'Content-Type': 'text/html; charset=utf8',
+                        });
+                    }
                     res.write(body);
                     res.end();
                 });
             });
+            request.on("error", (e) => {
+                console.error(`Error fetching ${webappUri.href} .. ${e.message}`);
+                error(500, e.message);
+            });
         };
+
+        const webappNames = SUB_WEBAPPS.filter(w => w.localServeEndpoint).map(w => w.localServeEndpoint);
 
         const webappIdx = webappNames.findIndex(s => new RegExp(`^-{0,3}${s}$`).test(elts[0] || ''));
         if (webappIdx >= 0) {
@@ -1165,19 +1179,11 @@ export function serveAsync(options: ServeOptions) {
             return
         }
 
-        if (pathname == "/--skillmap") {
-            sendFile(path.join(publicDir, 'skillmap.html'));
-            return
-        }
-
-        if (pathname == "/--authcode") {
-            sendFile(path.join(publicDir, 'authcode.html'));
-            return
-        }
-
-        if (pathname == "/--multiplayer") {
-            sendFile(path.join(publicDir, 'multiplayer.html'));
-            return
+        for (const subapp of SUB_WEBAPPS) {
+            if (subapp.localServeWebConfigUrl && pathname === `/--${subapp.name}`) {
+                sendFile(path.join(publicDir, `${subapp.name}.html`));
+                return
+            }
         }
 
         if (/\/-[-]*docs.*$/.test(pathname)) {

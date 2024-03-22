@@ -14,6 +14,10 @@ import * as tutorial from "./tutorial";
 import * as _package from "./package";
 import { fireClickOnEnter } from "./util"
 
+import * as pxtblockly from "../../pxtblocks";
+import IProjectView = pxt.editor.IProjectView;
+import UserInfo = pxt.editor.UserInfo;
+
 const MAX_COMMIT_DESCRIPTION_LENGTH = 70;
 
 interface DiffFile {
@@ -34,7 +38,7 @@ interface DiffCache {
 }
 
 interface GithubProps {
-    parent: pxt.editor.IProjectView;
+    parent: IProjectView;
 }
 
 interface GithubState {
@@ -604,9 +608,9 @@ class GithubComponent extends data.Component<GithubProps, GithubState> {
             blocksScreenshotAsync: () => this.props.parent.blocksScreenshotAsync(1, pxt.appTarget.appTheme?.embedBlocksInSnapshot),
             blocksDiffScreenshotAsync: () => {
                 const f = pkg.mainEditorPkg().sortedFiles().find(f => f.name == pxt.MAIN_BLOCKS);
-                const diff = pxt.blocks.diffXml(f.baseGitContent, f.content);
+                const diff = pxtblockly.diffXml(f.baseGitContent, f.content);
                 if (diff && diff.ws)
-                    return pxt.blocks.layout.toPngAsync(diff.ws, 1);
+                    return pxtblockly.toPngAsync(diff.ws, 1);
                 return Promise.resolve(undefined);
             }
         })
@@ -751,7 +755,7 @@ class GithubComponent extends data.Component<GithubProps, GithubState> {
         const githubId = this.parsedRepoId()
         const master = githubId.tag === "master";
         const main = githubId.tag === "main";
-        const user = this.getData("github:user") as pxt.editor.UserInfo;
+        const user = this.getData("github:user") as UserInfo;
 
         // don't use gs.prUrl, as it gets cleared often
         const url = `https://github.com/${githubId.slug}/${master && !githubId.fileName ? "" : pxt.github.join("tree", githubId.tag || "master", githubId.fileName)}`;
@@ -965,7 +969,7 @@ class DiffView extends sui.StatelessUIElement<DiffViewProps> {
             // bail off to decompiled diffs
             let markdown: string;
             if (f.tsEditorFile &&
-                pxt.blocks.needsDecompiledDiff(baseContent, content)
+                pxtblockly.needsDecompiledDiff(baseContent, content)
             ) {
                 markdown =
                     `
@@ -1218,7 +1222,7 @@ interface GitHubViewProps {
     gs: pxt.github.GitJson;
     isBlocks: boolean;
     needsCommit: boolean;
-    user: pxt.editor.UserInfo;
+    user: UserInfo;
     pullStatus: workspace.PullStatus;
     pullRequest: pxt.github.PullRequest;
 }
@@ -1586,7 +1590,7 @@ class CommitView extends sui.UIElement<CommitViewProps, CommitViewState> {
                     gitFile: oldContent,
                     editorFile: newContent
                 }
-                if (isBlocks && pxt.blocks.needsDecompiledDiff(oldContent, newContent)) {
+                if (isBlocks && pxtblockly.needsDecompiledDiff(oldContent, newContent)) {
                     const vpn = p.getVirtualFileName(pxt.JAVASCRIPT_PROJECT_NAME);
                     const virtualNewFile = files.find(ff => ff.name == vpn);
                     const virtualOldContent = oldFiles[vpn];
@@ -1733,7 +1737,7 @@ class HistoryZone extends sui.UIElement<GitHubViewProps, HistoryState> {
 export class Editor extends srceditor.Editor {
     private view: GithubComponent;
 
-    constructor(public parent: pxt.editor.IProjectView) {
+    constructor(public parent: IProjectView) {
         super(parent)
         this.handleViewRef = this.handleViewRef.bind(this);
     }

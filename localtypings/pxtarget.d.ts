@@ -1,6 +1,5 @@
 /// <reference path="pxtpackage.d.ts" />
 /// <reference path="pxtparts.d.ts" />
-/// <reference path="pxtblockly.d.ts" />
 /// <reference path="pxtelectron.d.ts" />
 
 declare namespace pxt {
@@ -34,6 +33,7 @@ declare namespace pxt {
         electronManifest?: pxt.electron.ElectronManifest;
         profileNotification?: ProfileNotification;
         kiosk?: KioskConfig;
+        teachertool?: TeacherToolConfig;
     }
 
     interface PackagesConfig {
@@ -87,6 +87,15 @@ declare namespace pxt {
         name: string;
         description: string;
         highScoreMode: string;
+    }
+
+    interface TeacherToolConfig {
+        carousels?: TeacherToolCarouselConfig[];
+    }
+
+    interface TeacherToolCarouselConfig {
+        title: string;
+        cardsUrl: string;
     }
 
     interface AppTarget {
@@ -359,7 +368,8 @@ declare namespace pxt {
         invertedMonaco?: boolean; // if true: use the vs-dark monaco theme
         invertedGitHub?: boolean; // inverted github view
         lightToc?: boolean; // if true: do NOT use inverted style in docs toc
-        blocklyOptions?: Blockly.BlocklyOptions; // Blockly options, see Configuration: https://developers.google.com/blockly/guides/get-started/web
+        // FIXME (riknoll): Can't use Blockly types here
+        blocklyOptions?: any; // Blockly options, see Configuration: https://developers.google.com/blockly/guides/get-started/web
         hideFlyoutHeadings?: boolean; // Hide the flyout headings at the top of the flyout when on a mobile device.
         monacoColors?: pxt.Map<string>; // Monaco theme colors, see https://code.visualstudio.com/docs/getstarted/theme-color-reference
         simAnimationEnter?: string; // Simulator enter animation
@@ -401,8 +411,8 @@ declare namespace pxt {
         useUploadMessage?: boolean; // change "Download" text to "Upload"
         downloadIcon?: string; // which icon io use for download
         blockColors?: Map<string>; // block namespace colors, used for build in categories
-        blockIcons?: Map<string>;
-        blocklyColors?: Blockly.Colours; // Blockly workspace, flyout and other colors
+        blockIcons?: Map<string | number>;
+        blocklyColors?: pxt.Map<string>; // Overrides for the styles in the workspace Blockly.Theme.ComponentStyle
         socialOptions?: SocialOptions; // show social icons in share dialog, options like twitter handle and org handle
         noReloadOnUpdate?: boolean; // do not notify the user or reload the page when a new app cache is downloaded
         appPathNames?: string[]; // Authorized URL paths in embedded apps, all other paths will display a warning banner
@@ -500,6 +510,8 @@ declare namespace pxt {
         timeMachine?: boolean; // Save/restore old versions of a project experiment
         blocklySoundVolume?: number; // A number between 0 and 1 that sets the volume for blockly sounds (e.g. connect, disconnect, click)
         timeMachineQueryParams?: string[]; // An array of query params to pass to timemachine iframe embed
+        timeMachineDiffInterval?: number; // An interval in milliseconds at which to take diffs to store in project history. Defaults to 5 minutes
+        timeMachineSnapshotInterval?: number; // An interval in milliseconds at which to take full project snapshots in project history. Defaults to 15 minutes
     }
 
     interface DownloadDialogTheme {

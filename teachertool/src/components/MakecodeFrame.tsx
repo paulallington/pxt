@@ -1,141 +1,50 @@
-/// <reference path="../../../built/pxteditor.d.ts" />
-import * as React from "react";
-import { useState, useEffect, useRef } from "react";
-import { ProgressBar } from "react-common/components/controls/ProgressBar";
-interface MakeCodeFrameProps {
-    pageSourceUrl: string;
-    highContrast?: boolean;
-    onFrameOpen: () => void;
-    onFrameClose: () => void;
-    tutorialEventHandler?: (event: pxt.editor.EditorMessageTutorialEventRequest) => void;
-}
+/// <reference path="../../../localtypings/pxteditor.d.ts" />
 
-type FrameState = "loading" | "no-project" | "opening-project" | "project-open" | "closing-project";
+import css from "./styling/MakeCodeFrame.module.scss";
+import { useContext, useEffect } from "react";
+import { setEditorRef } from "../services/makecodeEditorService";
+import { AppStateContext } from "../state/appStateContext";
+import { getEditorUrl } from "../utils";
 
-interface PendingMessage {
-    original: pxt.editor.EditorMessageRequest;
-    handler: (response: any) => void;
-}
+interface IProps {}
 
-export const MakeCodeFrame: React.FC<MakeCodeFrameProps> =
-    ( { pageSourceUrl,
-        highContrast,
-        onFrameClose,
-        onFrameOpen
-    } ) => {
-    let ref: HTMLIFrameElement | undefined;
-    const messageQueue: pxt.editor.EditorMessageRequest[] = [];
-    let nextId: number = 0;
-    let pendingMessages: {[index: string]: PendingMessage} = {};
-    const [frameState, setFrameState] = useState<FrameState>("loading");
-    const [loadPercent, setLoadPercent] = useState(0);
-    const [workspaceReady, setWorkspaceReady] = useState(false);
+export const MakeCodeFrame: React.FC<IProps> = () => {
+    const { state: teacherTool } = useContext(AppStateContext);
 
-    let frameRef = useRef<HTMLIFrameElement>(null);
-
+    // Clear iframe state when the iframe url is changed
     useEffect(() => {
-        // logic we want to do when the iframe is loaded
-        if (ref && ref.contentWindow) {
-            window.addEventListener("message", onMessageReceived);
-            ref.addEventListener("load", handleFrameReload)
-
+        if (!teacherTool.projectMetadata?.id) {
+            setEditorRef(undefined);
         }
+    }, [teacherTool.projectMetadata?.id]);
 
-        // logic we want when the iframe unmounts
-        return () => {
-            window.removeEventListener("message", onMessageReceived);
-            if (ref && ref.contentWindow) {
-                ref.removeEventListener("load", handleFrameReload)
-            }
+    function createIFrameUrl(shareId: string): string {
+        const editorUrl: string = pxt.BrowserUtils.isLocalHost()
+            ? "http://localhost:3232/index.html"
+            : getEditorUrl((window as any).pxtTargetBundle.appTheme.embedUrl);
+
+        let url = editorUrl;
+        if (editorUrl.charAt(editorUrl.length - 1) === "/" && !pxt.BrowserUtils.isLocalHost()) {
+            url = editorUrl.substr(0, editorUrl.length - 1);
         }
-    }, [])
-
-    useEffect(() => {
-        sendMessageAsync({
-            type: "pxteditor",
-            action: "sethighcontrast",
-            on: highContrast
-        }  as pxt.editor.EditorMessageSetHighContrastRequest);
-    }, [highContrast])
-
-
-    useEffect(() => {
-        if (frameState === "project-open") {
-            setFrameState("closing-project");
-            onFrameClose();
-        }
-        else if (frameState === "no-project") {
-            setFrameState("opening-project");
-            onFrameOpen();
-        }
-    }, [frameState]);
-
-
-    const handleFrameReload = () => {
-        setFrameState("loading")
+        url += `?controller=1&teachertool=1&readonly=1&ws=mem&nocookiebanner=1#pub:${shareId}`;
+        return url;
     }
 
-    const onMessageReceived = (event: MessageEvent) => {
-        const data = event.data as pxt.editor.EditorMessageRequest;
-        if (frameState === "opening-project") setLoadPercent(Math.min((loadPercent || 0) + 7, 95));
-
-        if (data.type === "pxteditor" && data.id && pendingMessages[data.id]) {
-            const pending = pendingMessages[data.id];
-            pending.handler(data);
-            delete pendingMessages[data.id];
-            return;
+    const handleIFrameRef = (el: HTMLIFrameElement | null) => {
+        if (el) {
+            setEditorRef(el);
         }
+    };
 
-        switch (data.action) {
-            case "newproject":
-                if (!workspaceReady) {
-                    setWorkspaceReady(true);
-                    sendMessageAsync(); // Flush message queue
-                }
-                if (frameState === "loading") {
-                    setFrameState("no-project");
-                }
-                break;
-            default:
-                console.log(JSON.stringify(data, null, 4));
-        }
-    }
-
-    const sendMessageAsync = (message?: any) => {
-        return new Promise(resolve => {
-            const sendMessageCore = (message: any) => {
-                message.response = true;
-                message.id = nextId++ + "";
-                pendingMessages[message.id] = {
-                    original: message,
-                    handler: resolve
-                };
-                ref!.contentWindow!.postMessage(message, "*");
-            }
-
-            if (ref) {
-                if (!workspaceReady) {
-                    messageQueue.push(message);
-                }
-                else {
-                    while (messageQueue.length) {
-                        sendMessageCore(messageQueue.shift());
-                    }
-                    if (message) sendMessageCore(message);
-                }
-            }
-        });
-    }
-
-    const openingProject = frameState === "opening-project";
-    const showLoader = openingProject || frameState === "closing-project";
     /* eslint-disable @microsoft/sdl/react-iframe-missing-sandbox */
-    return <div className="makecode-frame-outer" style={{ display: "block" }}>
-        <div className={`makecode-frame-loader ${showLoader ? "" : "hidden"}`}>
-            {openingProject && <ProgressBar className="makecode-frame-loader-bar" value={loadPercent! / 100} />}
-            <div className="makecode-frame-loader-text">{lf("Loading...")}</div>
-        </div>
-        <iframe className="makecode-frame" src={pageSourceUrl} title={"title"} ref={frameRef}></iframe>
-    </div>
+    return teacherTool.projectMetadata ? (
+        <iframe
+            className={css["makecode-frame"]}
+            src={createIFrameUrl(teacherTool.projectMetadata.id)}
+            title={"title"}
+            ref={handleIFrameRef}
+        />
+    ) : null;
     /* eslint-enable @microsoft/sdl/react-iframe-missing-sandbox */
-}
+};

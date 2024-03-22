@@ -15,7 +15,8 @@ import * as tutorial from "./tutorial";
 import * as workspace from "./workspace";
 import {infoNotification} from "./core";
 
-type ISettingsProps = pxt.editor.ISettingsProps;
+import ISettingsProps = pxt.editor.ISettingsProps;
+
 type HeaderBarView = "home" | "editor" | "tutorial" | "tutorial-tab" | "debugging" | "sandbox" | "time-machine";
 const LONGPRESS_DURATION = 750;
 const isAdmin = pxt.BrowserUtils.checkIfAdmin();
@@ -37,7 +38,7 @@ export class HeaderBar extends data.Component<ISettingsProps, {}> {
     async saveProjectToApi() {
         let header = pkg.mainEditorPkg().header
         const text = await workspace.getTextAsync(header.id);
-        await workspace.saveAsync(header, text, false, true);
+        await workspace.saveAsync(header, text, false);
         core.infoNotification(lf("Project Saved"))
     }
 

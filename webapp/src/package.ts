@@ -1,15 +1,12 @@
 import * as workspace from "./workspace";
 import * as data from "./data";
 import * as core from "./core";
-import * as db from "./db";
 import * as compiler from "./compiler";
-import * as auth from "./auth";
-import * as toolbox from "./toolbox"
 
 import Util = pxt.Util;
-import { getBlocksEditor } from "./app";
+import { HOSTCACHE_TABLE, getObjectStoreAsync } from "./idbworkspace";
 
-let hostCache = new db.Table("hostcache")
+import IFile = pxt.editor.IFile;
 
 let extWeight: pxt.Map<number> = {
     "ts": 10,
@@ -26,7 +23,7 @@ export function setupAppTarget(trgbundle: pxt.TargetBundle) {
 const GENERATED_EXTENSION = ".g."
 
 
-export class File implements pxt.editor.IFile {
+export class File implements IFile {
     inSyncWithEditor = true;
     diagnostics: pxtc.KsDiagnostic[];
     numDiagnosticsOverride: number;
@@ -686,19 +683,27 @@ class Host
         return pxt.hexloader.getHexInfoAsync(this, extInfo).catch(core.handleNetworkError);
     }
 
-    cacheStoreAsync(id: string, val: string): Promise<void> {
-        return hostCache.forceSetAsync({
-            id: id,
-            val: val
-        }).then(() => { }, e => {
+    async cacheStoreAsync(id: string, val: string): Promise<void> {
+        const hostCache = await getHostCacheAsync();
+
+        try {
+            await hostCache.setAsync({ id, val });
+        }
+        catch (e) {
             pxt.tickEvent('cache.store.failed', { error: e.name });
             pxt.log(`cache store failed for ${id}: ${e.name}`)
-        })
+        }
     }
 
-    cacheGetAsync(id: string): Promise<string> {
-        return hostCache.getAsync(id)
-            .then(v => v.val, e => null)
+    async cacheGetAsync(id: string): Promise<string> {
+        const hostCache = await getHostCacheAsync();
+
+        try {
+            return (await hostCache.getAsync(id)).val;
+        }
+        catch (e) {
+            return null;
+        }
     }
 
     downloadPackageAsync(pkg: pxt.Package): Promise<void> {
@@ -784,8 +789,7 @@ export function mainEditorPkg() {
 
 export function genFileName(extension: string): string {
     /* eslint-disable no-control-regex */
-    let sanitizedName = mainEditorPkg().header.name.replace(/[()\\\/.,?*^:<>!;'#$%^&|"@+=«»°{}\[\]¾½¼³²¦¬¤¢£~­¯¸`±\x00-\x1F]/g, '');
-    sanitizedName = sanitizedName.trim().replace(/\s+/g, '-');
+    let sanitizedName = pxt.Util.sanitizeFileName(mainEditorPkg().header.name);
     /* eslint-enable no-control-regex */
     if (pxt.appTarget.appTheme && pxt.appTarget.appTheme.fileNameExclusiveFilter) {
         const rx = new RegExp(pxt.appTarget.appTheme.fileNameExclusiveFilter, 'g');
@@ -992,4 +996,8 @@ export function getExtensionOfFileName(filename: string) {
     let m = /\.([^\.]+)$/.exec(filename)
     if (m) return m[1]
     return ""
+}
+
+async function getHostCacheAsync(): Promise<pxt.BrowserUtils.IDBObjectStoreWrapper<{id: string, val: string}>> {
+    return getObjectStoreAsync(HOSTCACHE_TABLE)
 }

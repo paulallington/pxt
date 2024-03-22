@@ -19,6 +19,8 @@ const clean = () => rimraf("built").then(() => rimraf("temp"));
 const update = () => exec("git pull", true).then(() => exec("npm install", true))
 const noop = () => Promise.resolve();
 
+const SUB_WEBAPPS = require("./cli/webapps-config.json").webapps;
+
 /** onlineline */
 const onlinelearning = () => {
     const tasks = ["schedule", "projects"].map(fn =>
@@ -38,30 +40,19 @@ const pxtlib = () => compileTsProject("pxtlib");
 const pxtcompiler = () => compileTsProject("pxtcompiler");
 const pxtpy = () => compileTsProject("pxtpy");
 const pxtsim = () => compileTsProject("pxtsim");
-const pxtblocks = () => compileTsProject("pxtblocks");
-const pxtrunner = () => compileTsProject("pxtrunner");
-const pxteditor = () => compileTsProject("pxteditor");
+const pxtrunner = () => compileTsProject("pxtrunner", "built", true);
+const pxteditor = () => compileTsProject("pxteditor", "built", true);
 const pxtweb = () => compileTsProject("docfiles/pxtweb", "built/web");
 const backendutils = () => compileTsProject("backendutils")
 const cli = () => compileTsProject("cli", "built", true);
 const webapp = () => compileTsProject("webapp", "built", true);
 const reactCommon = () => compileTsProject("react-common", "built/react-common", true);
-
-const pxtblockly = () => gulp.src([
-    "webapp/public/blockly/blockly_compressed.js",
-    "webapp/public/blockly/blocks_compressed.js",
-    "webapp/public/blockly/plugins.js",
-    "webapp/public/blockly/msg/js/en.js",
-    "built/pxtblocks.js"
-])
-    .pipe(concat("pxtblockly.js"))
-    .pipe(gulp.dest("built"));
+const pxtblocks = () => compileTsProject("pxtblocks", "built/pxtblocks", true);
 
 const pxtapp = () => gulp.src([
     "node_modules/lzma/src/lzma_worker-min.js",
     "node_modules/dompurify/dist/purify.min.js",
     "built/pxtlib.js",
-    "built/pxteditor.js",
     "built/pxtsim.js"
 ])
     .pipe(concat("pxtapp.js"))
@@ -87,15 +78,13 @@ const pxtembed = () => gulp.src([
     "built/pxtlib.js",
     "built/pxtcompiler.js",
     "built/pxtpy.js",
-    "built/pxtblockly.js",
-    "built/pxteditor.js",
     "built/pxtsim.js",
-    "built/pxtrunner.js"
+    "built/web/runnerembed.js"
 ])
     .pipe(concat("pxtembed.js"))
     .pipe(gulp.dest("built/web"));
 
-const pxtjs = () => gulp.src([
+const buildpxtjs = () => gulp.src([
     "pxtcompiler/ext-typescript/lib/typescript.js",
     "built/pxtlib.js",
     "built/pxtcompiler.js",
@@ -112,6 +101,11 @@ const pxtjs = () => gulp.src([
     `))
     .pipe(gulp.dest("built"));
 
+const copySubappsConfig = () => gulp.src("cli/webapps-config.json")
+    .pipe(gulp.dest("built"));
+
+const pxtjs = gulp.parallel(buildpxtjs, copySubappsConfig);
+
 const pxtdts = () => gulp.src("built/cli.d.ts")
     .pipe(concat("pxt.d.ts"))
     .pipe(gulp.dest("built"));
@@ -123,10 +117,10 @@ function initWatch() {
     const tasks = [
         pxtlib,
         gulp.parallel(pxtcompiler, pxtsim, backendutils),
-        gulp.parallel(pxtpy, gulp.series(copyBlockly, pxtblocks, pxtblockly)),
-        pxteditor,
+        pxtpy,
+        gulp.parallel(pxtblocks, pxteditor),
         gulp.parallel(pxtrunner, cli, pxtcommon),
-        updatestrings,
+        gulp.parallel(updatestrings, browserifyEmbed),
         gulp.parallel(pxtjs, pxtdts, pxtapp, pxtworker, pxtembed),
         targetjs,
         reactCommon,
@@ -144,7 +138,7 @@ function initWatch() {
     gulp.watch("./backendutils/**/*", gulp.series(backendutils, ...tasks.slice(2)));
 
     gulp.watch("./pxtpy/**/*", gulp.series(pxtpy, ...tasks.slice(3)));
-    gulp.watch("./pxtblocks/**/*", gulp.series(gulp.series(copyBlockly, pxtblocks, pxtblockly), ...tasks.slice(3)));
+    gulp.watch("./pxtblocks/**/*", gulp.series(pxtblocks, ...tasks.slice(4)));
 
     gulp.watch("./pxteditor/**/*", gulp.series(pxteditor, ...tasks.slice(4)));
 
@@ -164,7 +158,7 @@ function initWatchCli() {
     const tasks = [
         pxtlib,
         gulp.parallel(pxtcompiler),
-        gulp.parallel(pxtpy, gulp.series(pxtblocks, pxtblockly)),
+        pxtpy,
         cli,
         notifyBuildComplete
     ]
@@ -174,7 +168,6 @@ function initWatchCli() {
     gulp.watch("./pxtcompiler/**/*", gulp.series(pxtcompiler, ...tasks.slice(2)));
 
     gulp.watch("./pxtpy/**/*", gulp.series(pxtpy, ...tasks.slice(3)));
-    gulp.watch("./pxtblockly/**/*", gulp.series(gulp.series(copyBlockly, pxtblocks, pxtblockly), ...tasks.slice(3)));
 
     gulp.watch("./cli/**/*", gulp.series(cli, ...tasks.slice(5)));
 }
@@ -235,24 +228,8 @@ function updatestrings() {
     ], true);
 }
 
-function updateSkillMapStrings() {
-    return buildStrings("built/skillmap-strings.json", ["skillmap/src"], true);
-}
-
-function updateAuthcodeStrings() {
-    return buildStrings("built/authcode-strings.json", ["authcode/src"], true);
-}
-
-function updateMultiplayerStrings() {
-    return buildStrings("built/multiplayer-strings.json", ["multiplayer/src"], true);
-}
-
-function updateKioskStrings() {
-    return buildStrings("built/kiosk-strings.json", ["kiosk/src"], true);
-}
-
-function updateTeacherToolStrings() {
-    return buildStrings("built/teachertool-strings.json", ["teachertool/src"], true);
+function updateWebappStrings(name) {
+    return buildStrings(`built/${name}-strings.json`, [`${name}/src`], true);
 }
 
 // TODO: Copied from Jakefile; should be async
@@ -390,11 +367,7 @@ const copyWebapp = () =>
         "built/pxtlib.js",
         "built/pxtcompiler.js",
         "built/pxtpy.js",
-        "built/pxtblocks.js",
-        "built/pxtblockly.js",
         "built/pxtsim.js",
-        "built/pxtrunner.js",
-        "built/pxteditor.js",
         "built/webapp/src/worker.js",
         "built/webapp/src/serviceworker.js",
         "built/webapp/src/simulatorserviceworker.js",
@@ -405,13 +378,16 @@ const copyWebapp = () =>
 const copySemanticFonts = () => gulp.src("node_modules/semantic-ui-less/themes/default/assets/fonts/*")
     .pipe(gulp.dest("built/web/fonts"))
 
-const browserifyWebapp = () => process.env.PXT_ENV == 'production' ?
-    exec('node node_modules/browserify/bin/cmd ./built/webapp/src/app.js -g [ envify --NODE_ENV production ] -g uglifyify -o ./built/web/main.js') :
-    exec('node node_modules/browserify/bin/cmd built/webapp/src/app.js -o built/web/main.js --debug')
+const execBrowserify = (entryPoint, outfile) => process.env.PXT_ENV == 'production' ?
+    exec(`node node_modules/browserify/bin/cmd ${entryPoint} -g [ envify --NODE_ENV production ] -g [ uglifyify --ignore '**/node_modules/@blockly/**' ] -o ${outfile}`) :
+    exec(`node node_modules/browserify/bin/cmd ${entryPoint} -o ${outfile} --debug`);
 
-const browserifyAssetEditor = () => process.env.PXT_ENV == 'production' ?
-    exec('node node_modules/browserify/bin/cmd ./built/webapp/src/assetEditor.js -g [ envify --NODE_ENV production ] -g uglifyify -o ./built/web/pxtasseteditor.js') :
-    exec('node node_modules/browserify/bin/cmd built/webapp/src/assetEditor.js -o built/web/pxtasseteditor.js --debug')
+const browserifyWebapp = () => execBrowserify("./built/webapp/src/app.js", "./built/web/main.js");
+
+const browserifyAssetEditor = () => execBrowserify("./built/webapp/src/assetEditor.js", "./built/web/pxtasseteditor.js");
+
+const browserifyEmbed = () => execBrowserify("./built/pxtrunner/embed.js", "./built/web/runnerembed.js");
+
 
 const buildSVGIcons = () => {
     let webfontsGenerator = require('@vusion/webfonts-generator')
@@ -534,63 +510,40 @@ const copyMonaco = gulp.series(
     stripMonacoSourceMaps
 );
 
+function createWebappTasks(root, outname) {
+    outname = outname || root;
+    const outdir = `built/web/${outname}`;
 
+    const cleanWebapp = () => rimraf(outdir);
 
-/********************************************************
-                      Blockly
-*********************************************************/
+    const npmBuildWebapp = () => exec("npm run build", true, { cwd: root });
 
-const copyBlocklyCompressed = () => gulp.src([
-    "node_modules/pxt-blockly/blocks_compressed.js",
-    "node_modules/pxt-blockly/blockly_compressed.js"
-])
-    .pipe(gulp.dest("webapp/public/blockly/"));
+    const buildWebapp = async () => await npmBuildWebapp();
 
-const copyBlocklyExtensions = () => gulp.src("node_modules/@blockly/**/dist/index.js")
-    .pipe(concat("plugins.js"))
-    .pipe(gulp.dest("webapp/public/blockly/"));
+    const copyWebappCss = () => gulp.src(`${root}/build/static/css/*`)
+        .pipe(gulp.dest(`${outdir}/css`));
 
-const copyBlocklyEnJs = () => gulp.src("node_modules/pxt-blockly/msg/js/en.js")
-    .pipe(gulp.dest("webapp/public/blockly/msg/js/"));
+    const copyWebappJs = () => gulp.src(`${root}/build/static/js/*`)
+        .pipe(gulp.dest(`${outdir}/js`));
 
-const copyBlocklyEnJson = () => gulp.src("node_modules/pxt-blockly/msg/json/en.json")
-    .pipe(gulp.dest("webapp/public/blockly/msg/json/"));
+    const copyWebappHtml = () => rimraf(`webapp/public/${outname}.html`)
+        .then(() => gulp.src(`${root}/build/index.html`)
+                        .pipe(replace(/="\/static\//g, `="/blb/${outname}/`))
+                        .pipe(concat(`${outname}.html`))
+                        .pipe(gulp.dest("webapp/public")));
 
-const copyBlocklyMedia = () => gulp.src("node_modules/pxt-blockly/media/*")
-    .pipe(gulp.dest("webapp/public/blockly/media"))
+    const result = gulp.series(cleanWebapp, buildWebapp, gulp.series(copyWebappCss, copyWebappJs, copyWebappHtml));
 
-const copyBlocklyTypings = () => gulp.src("node_modules/pxt-blockly/typings/blockly.d.ts")
-    .pipe(gulp.dest("localtypings/"))
+    exports[outname] = result;
 
-const copyBlockly = gulp.parallel(copyBlocklyCompressed, copyBlocklyExtensions, copyBlocklyEnJs, copyBlocklyEnJson, copyBlocklyMedia, copyBlocklyTypings);
-
+    return result;
+}
 
 /********************************************************
                       Skillmap
 *********************************************************/
 
-const skillmapRoot = "skillmap";
-const skillmapOut = "built/web/skillmap";
-
-const cleanSkillmap = () => rimraf(skillmapOut);
-
-const npmBuildSkillmap = () => exec("npm run build", true, { cwd: skillmapRoot });
-
-const buildSkillmap = async () => await npmBuildSkillmap();
-
-const copySkillmapCss = () => gulp.src(`${skillmapRoot}/build/static/css/*`)
-    .pipe(gulp.dest(`${skillmapOut}/css`));
-
-const copySkillmapJs = () => gulp.src(`${skillmapRoot}/build/static/js/*`)
-    .pipe(gulp.dest(`${skillmapOut}/js`));
-
-const copySkillmapHtml = () => rimraf("webapp/public/skillmap.html")
-    .then(() => gulp.src(`${skillmapRoot}/build/index.html`)
-                    .pipe(replace(/="\/static\//g, `="/blb/skillmap/`))
-                    .pipe(concat("skillmap.html"))
-                    .pipe(gulp.dest("webapp/public")));
-
-const skillmap = gulp.series(cleanSkillmap, buildSkillmap, gulp.series(copySkillmapCss, copySkillmapJs, copySkillmapHtml));
+const skillmap = createWebappTasks("skillmap");
 
 const buildSkillmapTests = () => compileTsProject("skillmap/tests", "built/tests");
 const copySkillmapTests = () => gulp.src([
@@ -614,109 +567,25 @@ const testSkillmap = gulp.series(buildSkillmapTests, copySkillmapTests, runSkill
                       Authcode
 *********************************************************/
 
-const authcodeRoot = "authcode";
-const authcodeOut = "built/web/authcode";
-
-const cleanAuthcode = () => rimraf(authcodeOut);
-
-const npmBuildAuthcode = () => exec("npm run build", true, { cwd: authcodeRoot });
-
-const buildAuthcode = async () => await npmBuildAuthcode();
-
-const copyAuthcodeCss = () => gulp.src(`${authcodeRoot}/build/static/css/*`)
-    .pipe(gulp.dest(`${authcodeOut}/css`));
-
-const copyAuthcodeJs = () => gulp.src(`${authcodeRoot}/build/static/js/*`)
-    .pipe(gulp.dest(`${authcodeOut}/js`));
-
-const copyAuthcodeHtml = () => rimraf("webapp/public/authcode.html")
-    .then(() => gulp.src(`${authcodeRoot}/build/index.html`)
-                    .pipe(replace(/="\/static\//g, `="/blb/authcode/`))
-                    .pipe(concat("authcode.html"))
-                    .pipe(gulp.dest("webapp/public")));
-
-const authcode = gulp.series(cleanAuthcode, buildAuthcode, gulp.series(copyAuthcodeCss, copyAuthcodeJs, copyAuthcodeHtml));
+const authcode = createWebappTasks("authcode");
 
 /********************************************************
                       Multiplayer
 *********************************************************/
 
-const multiplayerRoot = "multiplayer";
-const multiplayerOut = "built/web/multiplayer";
-
-const cleanMultiplayer = () => rimraf(multiplayerOut);
-
-const npmBuildMultiplayer = () => exec("npm run build", true, { cwd: multiplayerRoot });
-
-const buildMultiplayer = async () => await npmBuildMultiplayer();
-
-const copyMultiplayerCss = () => gulp.src(`${multiplayerRoot}/build/static/css/*`)
-    .pipe(gulp.dest(`${multiplayerOut}/css`));
-
-const copyMultiplayerJs = () => gulp.src(`${multiplayerRoot}/build/static/js/*`)
-    .pipe(gulp.dest(`${multiplayerOut}/js`));
-
-const copyMultiplayerHtml = () => rimraf("webapp/public/multiplayer.html")
-    .then(() => gulp.src(`${multiplayerRoot}/build/index.html`)
-                    .pipe(replace(/="\/static\//g, `="/blb/multiplayer/`))
-                    .pipe(concat("multiplayer.html"))
-                    .pipe(gulp.dest("webapp/public")));
-
-const multiplayer = gulp.series(cleanMultiplayer, buildMultiplayer, gulp.series(copyMultiplayerCss, copyMultiplayerJs, copyMultiplayerHtml));
+const multiplayer = createWebappTasks("multiplayer");
 
 /********************************************************
                       Kiosk
 *********************************************************/
 
-const kioskRoot = "kiosk";
-const kioskOut = "built/web/kiosk";
-
-const cleanKiosk = () => rimraf(kioskOut);
-
-const npmBuildKiosk = () => exec("npm run build", true, { cwd: kioskRoot });
-
-const buildKiosk = async () => await npmBuildKiosk();
-
-const copyKioskCss = () => gulp.src(`${kioskRoot}/build/static/css/*`)
-    .pipe(gulp.dest(`${kioskOut}/css`));
-
-const copyKioskJs = () => gulp.src(`${kioskRoot}/build/static/js/*`)
-    .pipe(gulp.dest(`${kioskOut}/js`));
-
-const copyKioskHtml = () => rimraf("webapp/public/kiosk.html")
-    .then(() => gulp.src(`${kioskRoot}/build/index.html`)
-                    .pipe(replace(/="\/static\//g, `="/blb/kiosk/`))
-                    .pipe(concat("kiosk.html"))
-                    .pipe(gulp.dest("webapp/public")));
-
-const kiosk = gulp.series(cleanKiosk, buildKiosk, gulp.series(copyKioskCss, copyKioskJs, copyKioskHtml));
+const kiosk = createWebappTasks("kiosk");
 
 /********************************************************
                       Teacher Tool
 *********************************************************/
 
-const teacherToolRoot = "teachertool";
-const teacherToolOut = "built/web/teachertool";
-
-const cleanTeacherTool = () => rimraf(teacherToolOut);
-
-const npmBuildTeacherTool = () => exec("npm run build", true, { cwd: teacherToolRoot });
-
-const buildTeacherTool = async () => await npmBuildTeacherTool();
-
-const copyTeacherToolCss = () => gulp.src(`${teacherToolRoot}/build/static/css/*`)
-    .pipe(gulp.dest(`${teacherToolOut}/css`));
-
-const copyTeacherToolJs = () => gulp.src(`${teacherToolRoot}/build/static/js/*`)
-    .pipe(gulp.dest(`${teacherToolOut}/js`));
-
-const copyTeacherToolHtml = () => rimraf("webapp/public/teachertool.html")
-    .then(() => gulp.src(`${teacherToolRoot}/build/index.html`)
-                    .pipe(replace(/="\/static\//g, `="/blb/teachertool/`))
-                    .pipe(concat("teachertool.html"))
-                    .pipe(gulp.dest("webapp/public")));
-
-const teacherTool = gulp.series(cleanTeacherTool, buildTeacherTool, gulp.series(copyTeacherToolCss, copyTeacherToolJs, copyTeacherToolHtml));
+const teacherTool = createWebappTasks("teachertool");
 
 /********************************************************
                  Webapp build wrappers
@@ -726,13 +595,8 @@ const shouldBuildWebapps = () => (process.argv.indexOf("--no-webapps") === -1 &&
 
 const maybeUpdateWebappStrings = () => {
     if (!shouldBuildWebapps()) return noop;
-    return gulp.parallel(
-        updateSkillMapStrings,
-        updateAuthcodeStrings,
-        updateMultiplayerStrings,
-        updateKioskStrings,
-        updateTeacherToolStrings,
-    );
+
+    return gulp.parallel(...SUB_WEBAPPS.map(app => () => updateWebappStrings(app.name)));
 };
 
 const maybeBuildWebapps = () => {
@@ -762,9 +626,12 @@ const testpycomp = testTask("pyconverter-test", "pyconvertrunner.js");
 const testpytraces = testTask("runtime-trace-tests", "tracerunner.js");
 const testtutorials = testTask("tutorial-test", "tutorialrunner.js");
 const testlanguageservice = testTask("language-service", "languageservicerunner.js");
-const testpxteditor = testTask("pxt-editor-test", "editorrunner.js", ["built/pxteditor.js"]);
+const testpxteditor = pxtEditorTestTask();
 
-const buildKarmaRunner = () => compileTsProject("tests/blocklycompiler-test", "built/tests/", true);
+const buildKarmaRunner = () => compileTsProject("tests/blocklycompiler-test", "built/", true);
+const browserifyKarma = () =>
+    exec('node node_modules/browserify/bin/cmd built/tests/blocklycompiler-test/test.spec.js -o built/tests/karma-test-runner.js --debug');
+
 const runKarma = () => {
     let command;
     if (isWin32) {
@@ -777,9 +644,13 @@ const runKarma = () => {
     }
     return exec(command, true);
 }
-const karma = gulp.series(buildKarmaRunner, runKarma);
+const karma = gulp.series(buildKarmaRunner, browserifyKarma, runKarma);
 
-const buildBlocksTestRunner = () => compileTsProject("tests/blocks-test", "built/tests", false, "blocksrunner")
+const buildBlocksTestRunner = () => compileTsProject("tests/blocks-test", "built/", true);
+const browserifyBlocksTestRunner = () =>
+    exec('node node_modules/browserify/bin/cmd built/tests/blocks-test/blocksrunner.js -o built/tests/blocksrunner.js --debug');
+const browserifyBlocksPrep = () =>
+    exec('node node_modules/browserify/bin/cmd built/tests/blocks-test/blockssetup.js -o built/tests/blockssetup.js --debug');
 
 const testAll = gulp.series(
     testdecompiler,
@@ -827,23 +698,34 @@ function testTask(testFolder, testFile, additionalFiles) {
     const testArgs = " built/tests/" + testFolder + "/runner.js --reporter dot";
 
 
-    const runTest = () => isWin32 ?
-        exec(path.resolve("node_modules/.bin/mocha.cmd") + testArgs, true) :
-        exec("./node_modules/.bin/mocha" + testArgs, true);
+    const runTest = () => exec(getMochaExecutable() + testArgs, true);
 
     return gulp.series(buildTs, buildTestRunner, runTest);
+}
+
+function pxtEditorTestTask() {
+    const buildTs = () => compileTsProject("tests/pxt-editor-test", "built", true);
+    const browserifyTs = () => exec('node node_modules/browserify/bin/cmd built/tests/pxt-editor-test/editorrunner.js -o built/tests/pxt-editor-test/bundled.js --debug');
+    const buildRunner = () => gulp.src(["built/pxtlib.js", "built/tests/pxt-editor-test/bundled.js"]).pipe(concat("runner.js")).pipe(gulp.dest("built/tests/pxt-editor-test/"));
+    const runTests = () => exec(`${getMochaExecutable()} built/tests/pxt-editor-test/runner.js --reporter dot`, true)
+    return gulp.series([buildTs, browserifyTs, buildRunner, runTests]);
+}
+
+
+function getMochaExecutable() {
+    return isWin32 ? path.resolve("node_modules/.bin/mocha.cmd") : "./node_modules/.bin/mocha";
 }
 
 const buildAll = gulp.series(
     updatestrings,
     maybeUpdateWebappStrings(),
     copyTypescriptServices,
-    copyBlocklyTypings,
     gulp.parallel(pxtlib, pxtweb),
     gulp.parallel(pxtcompiler, pxtsim, backendutils),
-    gulp.parallel(pxtpy, gulp.series(copyBlockly, pxtblocks, pxtblockly)),
-    pxteditor,
+    pxtpy,
+    gulp.parallel(pxteditor, pxtblocks),
     gulp.parallel(pxtrunner, cli, pxtcommon),
+    browserifyEmbed,
     gulp.parallel(pxtjs, pxtdts, pxtapp, pxtworker, pxtembed),
     targetjs,
     reactCommon,
@@ -854,6 +736,7 @@ const buildAll = gulp.series(
     browserifyAssetEditor,
     gulp.parallel(semanticjs, copyJquery, copyWebapp, copySemanticFonts, copyMonaco),
     buildBlocksTestRunner,
+    gulp.parallel(browserifyBlocksTestRunner, browserifyBlocksPrep),
     runUglify
 );
 
@@ -864,7 +747,7 @@ exports.clean = clean;
 exports.build = buildAll;
 
 exports.webapp = gulp.series(
-    reactCommon,
+    gulp.parallel(reactCommon, pxtblocks, pxteditor),
     webapp,
     browserifyWebapp,
     browserifyAssetEditor
@@ -872,7 +755,6 @@ exports.webapp = gulp.series(
 
 exports.skillmapTest = testSkillmap;
 exports.updatestrings = updatestrings;
-exports.updateblockly = copyBlockly;
 exports.lint = lint
 exports.testdecompiler = testdecompiler;
 exports.testlang = testlang;
@@ -891,11 +773,6 @@ exports.watch = initWatch;
 exports.watchCli = initWatchCli;
 exports.testlanguageservice = testlanguageservice;
 exports.onlinelearning = onlinelearning;
-exports.skillmap = skillmap;
-exports.authcode = authcode;
-exports.multiplayer = multiplayer;
-exports.kiosk = kiosk;
-exports.teacherTool = teacherTool;
 exports.tt = teacherTool;
 exports.icons = buildSVGIcons;
 exports.testhelpers = testhelpers;
@@ -903,7 +780,7 @@ exports.testpxteditor = testpxteditor;
 exports.cli = gulp.series(
     gulp.parallel(pxtlib, pxtweb),
     gulp.parallel(pxtcompiler, pxtsim, backendutils),
-    gulp.parallel(pxtpy, gulp.series(copyBlockly, pxtblocks, pxtblockly)),
+    pxtpy,
     pxteditor,
     gulp.parallel(pxtrunner, cli, pxtcommon),
     pxtjs

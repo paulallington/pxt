@@ -566,6 +566,8 @@ namespace pxt.sprite {
                 return proj.getTransparency(16);
             case "myTiles.transparency8":
                 return proj.getTransparency(8);
+            case "myTiles.transparency4":
+                return proj.getTransparency(4);
             case "myTiles.transparency32":
                 return proj.getTransparency(32);
             default:
@@ -601,11 +603,12 @@ namespace pxt.sprite {
         return result;
     }
 
-    export function imageLiteralToBitmap(text: string): Bitmap {
+    export function imageLiteralToBitmap(text: string, templateLiteral = "img"): Bitmap {
         // Strip the tagged template string business and the whitespace. We don't have to exhaustively
         // replace encoded characters because the compiler will catch any disallowed characters and throw
         // an error before the decompilation happens. 96 is backtick and 9 is tab
         text = text.replace(/[ `]|(?:&#96;)|(?:&#9;)|(?:img)/g, "").trim();
+        text = text.replaceAll(templateLiteral, "");
         text = text.replace(/^["`\(\)]*/, '').replace(/["`\(\)]*$/, '');
         text = text.replace(/&#10;/g, "\n");
 
@@ -733,14 +736,14 @@ namespace pxt.sprite {
         pxt.sprite.trimTilemapTileset(result);
     }
 
-    function imageLiteralPrologue(fileType: "typescript" | "python"): string {
+    function imageLiteralPrologue(fileType: "typescript" | "python", templateLiteral = "img"): string {
         let res = '';
         switch (fileType) {
             case "python":
-                res = "img(\"\"\"";
+                res = `${templateLiteral}("""`;
                 break;
             default:
-                res = "img`";
+                res = `${templateLiteral}\``;
                 break;
         }
         return res;
@@ -776,10 +779,10 @@ namespace pxt.sprite {
         return res;
     }
 
-    export function bitmapToImageLiteral(bitmap: Bitmap, fileType: "typescript" | "python"): string {
+    export function bitmapToImageLiteral(bitmap: Bitmap, fileType: "typescript" | "python", templateLiteral = "img"): string {
         if (!bitmap || bitmap.height === 0 || bitmap.width === 0) return "";
 
-        let res = imageLiteralPrologue(fileType);
+        let res = imageLiteralPrologue(fileType, templateLiteral);
 
         if (bitmap) {
             const paddingBetweenPixels = (bitmap.width * bitmap.height > 300) ? "" : " ";
@@ -804,6 +807,7 @@ namespace pxt.sprite {
 
     export function tileWidthToTileScale(tileWidth: number) {
         switch (tileWidth) {
+            case 4: return `TileScale.Four`;
             case 8: return `TileScale.Eight`;
             case 16: return `TileScale.Sixteen`;
             case 32: return `TileScale.ThirtyTwo`;
@@ -814,6 +818,7 @@ namespace pxt.sprite {
     export function tileScaleToTileWidth(tileScale: string) {
         tileScale = tileScale.replace(/\s/g, "");
         switch (tileScale) {
+            case `TileScale.Four`: return 4;
             case `TileScale.Eight`: return 8;
             case `TileScale.Sixteen`: return 16;
             case `TileScale.ThirtyTwo`: return 32;

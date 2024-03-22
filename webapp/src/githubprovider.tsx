@@ -5,6 +5,8 @@ import * as cloudsync from "./cloudsync";
 import * as dialogs from "./dialogs";
 import * as workspace from "./workspace";
 
+import UserInfo = pxt.editor.UserInfo;
+
 export const PROVIDER_NAME = "github";
 
 export class GithubProvider extends cloudsync.ProviderBase {
@@ -155,10 +157,8 @@ export class GithubProvider extends cloudsync.ProviderBase {
         window.location.href = login;
         return pxt.Util.delay(1000);
     }
-    // http://localhost:3232/index.html#access_token=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&state=8836eec2-fbfa-4df1-d5dd-521663d66d28
-    // Save the token on the user and pass it into the url as an arg on load
-    // http://localhost:8080/project/63bee378687a7de3de1abe17?pid=5ccdea9b-08a7-4160-bbe6-8bddb7c041e3?admin=true&hideBlocks=true&hideJavascript=true&editor=true&autoSaveEnabled=true#access_token=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&state=efed967e-9096-4951-cef6-0a1845517da1
-    getUserInfoAsync(): Promise<pxt.editor.UserInfo> {
+
+    getUserInfoAsync(): Promise<UserInfo> {
         if (!this.token())
             return Promise.resolve(undefined);
         return pxt.github.authenticatedUserAsync()

@@ -1,48 +1,65 @@
 import { useEffect, useContext, useState } from "react";
-// eslint-disable-next-line import/no-unassigned-import
-import "./teacherTool.css";
 import { AppStateContext, AppStateReady } from "./state/appStateContext";
-import { usePromise } from "./hooks";
-import HeaderBar from "./components/HeaderBar";
-import Notifications from "./components/Notifications";
-import * as NotificationService from "./services/notificationService";
-import { postNotification } from "./transforms/postNotification";
-import { makeNotification } from "./utils";
-import DebugInput from "./components/DebugInput";
-import { EditorContainer } from "./components/EditorContainer";
+import { usePromise } from "./hooks/usePromise";
+import { makeToast } from "./utils";
+import * as Actions from "./state/actions";
+import { downloadTargetConfigAsync } from "./services/backendRequests";
+import { logDebug } from "./services/loggingService";
+import { HeaderBar } from "./components/HeaderBar";
+import { MainPanel } from "./components/MainPanel";
+import { Toasts } from "./components/Toasts";
+import { CatalogModal } from "./components/CatalogModal";
+import { showToast } from "./transforms/showToast";
+import { loadCatalogAsync } from "./transforms/loadCatalogAsync";
+import { loadValidatorPlansAsync } from "./transforms/loadValidatorPlansAsync";
+import { tryLoadLastActiveRubricAsync } from "./transforms/tryLoadLastActiveRubricAsync";
+import { ImportRubricModal } from "./components/ImportRubricModal";
+import { ConfirmationModal } from "./components/ConfirmationModal";
 
-
-function App() {
+export const App = () => {
     const { state, dispatch } = useContext(AppStateContext);
-    const [didNotify, setDidNotify] = useState(false);
+    const [inited, setInited] = useState(false);
 
     const ready = usePromise(AppStateReady, false);
 
     useEffect(() => {
-        // Init subsystems.
-        NotificationService.initialize();
-    }, [ready]);
+        if (ready && !inited) {
+            Promise.resolve().then(async () => {
+                const cfg = await downloadTargetConfigAsync();
+                dispatch(Actions.setTargetConfig(cfg || {}));
+                pxt.BrowserUtils.initTheme();
 
-    // Test notification
-    useEffect(() => {
-        if (ready && !didNotify) {
-            postNotification(makeNotification("🎓", 2000));
-            setDidNotify(true);
+                // Load catalog and validator plans into state.
+                await loadCatalogAsync();
+                await loadValidatorPlansAsync();
+                await tryLoadLastActiveRubricAsync();
+
+                // Test notification
+                showToast({
+                    ...makeToast("success", "🎓", 2000),
+                    hideIcon: true,
+                    hideDismissBtn: true,
+                    className: "app-large-toast",
+                });
+
+                setInited(true);
+                logDebug("App initialized");
+            });
         }
-    }, [ready]);
+    }, [ready, inited]);
 
-    return (
+    return !inited ? (
+        <div className="ui active dimmer">
+            <div className="ui large main loader msft"></div>
+        </div>
+    ) : (
         <>
             <HeaderBar />
-            <div className="app-container">
-                <DebugInput />
-                <EditorContainer />
-            </div>
-
-            <Notifications />
-
+            <MainPanel />
+            <CatalogModal />
+            <ImportRubricModal />
+            <ConfirmationModal />
+            <Toasts />
         </>
     );
-}
-
-export default App;
+};
