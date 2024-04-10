@@ -366,7 +366,7 @@ async function enqueueHistoryOperationAsync(id: string, op: (text: ScriptText, h
 
         op(saved.text, h);
 
-        const ver = await impl.setAsync(h, saved.version, saved.text);
+        const ver = await impl.setAsync(h, saved.version, saved.text, false);
         e.version = ver;
 
         data.invalidate("text:" + h.id);
@@ -559,7 +559,7 @@ export async function partialSaveAsync(id: string, filename: string, content: st
     return saveAsync(prev.header, newTxt);
 }
 
-export async function saveAsync(h: Header, text?: ScriptText, fromCloudSync?: boolean): Promise<void> {
+export async function saveAsync(h: Header, text?: ScriptText, fromCloudSync?: boolean, forceSave?: boolean): Promise<void> {
     pxt.debug(`workspace.saveAsync ${dbgHdrToString(h)}`)
     if (h.isDeleted)
         clearHeaderSession(h);
@@ -683,11 +683,11 @@ export async function saveAsync(h: Header, text?: ScriptText, fromCloudSync?: bo
 
 
         try {
-            ver = await impl.setAsync(h, e.version, toWrite);
+            ver = await impl.setAsync(h, e.version, toWrite, forceSave);
         } catch (e) {
             // Write failed; use in memory db.
             await switchToMemoryWorkspace("write failed");
-            ver = await impl.setAsync(h, e.version, toWrite);
+            ver = await impl.setAsync(h, e.version, toWrite, false);
         }
         if (!ver && text) {
             // write failed due to conflict

@@ -38,7 +38,7 @@ export class HeaderBar extends data.Component<ISettingsProps, {}> {
     async saveProjectToApi() {
         let header = pkg.mainEditorPkg().header
         const text = await workspace.getTextAsync(header.id);
-        await workspace.saveAsync(header, text, false);
+        await workspace.saveAsync(header, text, false, true);
         core.infoNotification(lf("Project Saved"))
     }
 
