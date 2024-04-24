@@ -1127,14 +1127,13 @@ namespace ts.pxtc.Util {
         return f() + f() + "-" + f() + "-4" + f().slice(-3) + "-" + f() + "-" + f() + f() + f();
     }
 
-    export function downloadLiveTranslationsAsync(lang: string, filename: string, branch?: string, etag?: string): Promise<pxt.Map<string>> {
+    export function downloadLiveTranslationsAsync(lang: string, filename: string, etag?: string): Promise<pxt.Map<string>> {
         // hitting the cloud
         function downloadFromCloudAsync(strings?: pxt.Map<string>) {
-            pxt.debug(`downloading translations for ${lang} ${filename} ${branch || ""}`);
+            pxt.debug(`downloading translations for ${lang} ${filename}`);
             let host = pxt.BrowserUtils.isLocalHost() || pxt.webConfig.isStatic ? "https://makecode.com/api/" : ""
-            // https://pxt.io/api/translations?filename=strings.json&lang=pl&approved=true&branch=v0
+            // https://pxt.io/api/translations?filename=strings.json&lang=pl&approved=true
             let url = `${host}translations?lang=${encodeURIComponent(lang)}&filename=${encodeURIComponent(filename)}&approved=true`;
-            if (branch) url += '&branch=' + encodeURIComponent(branch);
             const headers: pxt.Map<string> = {};
             if (etag && !pxt.Cloud.useCdnApi()) headers["If-None-Match"] = etag;
             return (host ? requestAsync : pxt.Cloud.apiRequestWithCdnAsync)({ url, headers }).then(resp => {
@@ -1143,7 +1142,7 @@ namespace ts.pxtc.Util {
                     // store etag and translations
                     etag = resp.headers["etag"] as string || "";
                     return pxt.BrowserUtils.translationDbAsync()
-                        .then(db => db.setAsync(lang, filename, branch, etag, resp.json || strings))
+                        .then(db => db.setAsync(lang, filename, etag, resp.json || strings))
                         .then(() => resp.json || strings);
                 }
 
@@ -1156,7 +1155,7 @@ namespace ts.pxtc.Util {
 
         // check for cache
         return pxt.BrowserUtils.translationDbAsync()
-            .then(db => db.getAsync(lang, filename, branch))
+            .then(db => db.getAsync(lang, filename))
             .then((entry: pxt.BrowserUtils.ITranslationDbEntry) => {
                 // if cached, return immediately
                 if (entry) {
@@ -1285,8 +1284,6 @@ namespace ts.pxtc.Util {
         targetId: string;
         baseUrl: string;
         code: string;
-        pxtBranch: string;
-        targetBranch: string;
         force?: boolean;
     }
 
@@ -1294,8 +1291,6 @@ namespace ts.pxtc.Util {
         const {
             targetId,
             baseUrl,
-            pxtBranch,
-            targetBranch,
             force,
         } = opts;
         let { code } = opts;
@@ -1310,8 +1305,7 @@ namespace ts.pxtc.Util {
         pxt.debug(`loc: ${code}`);
 
         const liveUpdateStrings = pxt.Util.liveLocalizationEnabled()
-        return downloadTranslationsAsync(targetId, baseUrl, code,
-            pxtBranch, targetBranch, liveUpdateStrings,
+        return downloadTranslationsAsync(targetId, baseUrl, code, liveUpdateStrings,
             ts.pxtc.Util.TranslationsKind.Editor)
             .then((translations) => {
                 if (translations) {
@@ -1322,8 +1316,7 @@ namespace ts.pxtc.Util {
 
                 // Download api translations
                 return ts.pxtc.Util.downloadTranslationsAsync(
-                    targetId, baseUrl, code,
-                    pxtBranch, targetBranch, liveUpdateStrings,
+                    targetId, baseUrl, code, liveUpdateStrings,
                     ts.pxtc.Util.TranslationsKind.Apis)
                     .then(trs => {
                         if (trs)
@@ -1339,7 +1332,7 @@ namespace ts.pxtc.Util {
         SkillMap
     }
 
-    export function downloadTranslationsAsync(targetId: string, baseUrl: string, code: string, pxtBranch: string, targetBranch: string, live: boolean, translationKind?: TranslationsKind): Promise<pxt.Map<string>> {
+    export function downloadTranslationsAsync(targetId: string, baseUrl: string, code: string, live: boolean, translationKind?: TranslationsKind): Promise<pxt.Map<string>> {
         translationKind = translationKind || TranslationsKind.Editor;
         code = normalizeLanguageCode(code)[0];
         if (code === "en-US" || code === "en") // shortcut
@@ -1350,22 +1343,22 @@ namespace ts.pxtc.Util {
             return Promise.resolve(translationsCache()[translationsCacheId]);
         }
 
-        let stringFiles: { branch: string, staticName: string, path: string }[];
+        let stringFiles: { staticName: string, path: string }[];
         switch (translationKind) {
             case TranslationsKind.Editor:
                 stringFiles = [
-                    { branch: pxtBranch, staticName: "strings.json", path: "strings.json" },
-                    { branch: targetBranch, staticName: "target-strings.json", path: targetId + "/target-strings.json" },
+                    { staticName: "strings.json", path: "strings.json" },
+                    { staticName: "target-strings.json", path: targetId + "/target-strings.json" },
                 ];
                 break;
             case TranslationsKind.Sim:
-                stringFiles = [{ branch: targetBranch, staticName: "sim-strings.json", path: targetId + "/sim-strings.json" }];
+                stringFiles = [{ staticName: "sim-strings.json", path: targetId + "/sim-strings.json" }];
                 break;
             case TranslationsKind.Apis:
-                stringFiles = [{ branch: targetBranch, staticName: "bundled-strings.json", path: targetId + "/bundled-strings.json" }];
+                stringFiles = [{ staticName: "bundled-strings.json", path: targetId + "/bundled-strings.json" }];
                 break;
             case TranslationsKind.SkillMap:
-                stringFiles = [{ branch: targetBranch, staticName: "skillmap-strings.json", path: "/skillmap-strings.json" }];
+                stringFiles = [{ staticName: "skillmap-strings.json", path: "/skillmap-strings.json" }];
                 break;
         }
         let translations: pxt.Map<string>;
@@ -1382,7 +1375,7 @@ namespace ts.pxtc.Util {
         if (live) {
             let errorCount = 0;
 
-            const pAll = U.promiseMapAllSeries(stringFiles, (file) => downloadLiveTranslationsAsync(code, file.path, file.branch)
+            const pAll = U.promiseMapAllSeries(stringFiles, (file) => downloadLiveTranslationsAsync(code, file.path)
                 .then(mergeTranslations, e => {
                     console.log(e.message);
                     ++errorCount;
@@ -1398,7 +1391,7 @@ namespace ts.pxtc.Util {
                 if (errorCount === stringFiles.length || !translations) {
                     // Retry with non-live translations by setting live to false
                     pxt.tickEvent("translations.livetranslationsfailed");
-                    return downloadTranslationsAsync(targetId, baseUrl, code, pxtBranch, targetBranch, false, translationKind);
+                    return downloadTranslationsAsync(targetId, baseUrl, code, false, translationKind);
                 }
 
                 return Promise.resolve(translations);
