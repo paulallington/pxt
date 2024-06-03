@@ -8,14 +8,14 @@ import { logDebug } from "./services/loggingService";
 import { HeaderBar } from "./components/HeaderBar";
 import { MainPanel } from "./components/MainPanel";
 import { Toasts } from "./components/Toasts";
-import { CatalogModal } from "./components/CatalogModal";
 import { showToast } from "./transforms/showToast";
 import { loadCatalogAsync } from "./transforms/loadCatalogAsync";
 import { loadValidatorPlansAsync } from "./transforms/loadValidatorPlansAsync";
-import { tryLoadLastActiveRubricAsync } from "./transforms/tryLoadLastActiveRubricAsync";
-import { ImportRubricModal } from "./components/ImportRubricModal";
+import { tryLoadLastActiveChecklistAsync } from "./transforms/tryLoadLastActiveChecklistAsync";
+import { ImportChecklistModal } from "./components/ImportChecklistModal";
 import { ConfirmationModal } from "./components/ConfirmationModal";
 import { BlockPickerModal } from "./components/BlockPickerModal";
+import { ScreenReaderAnnouncer } from "./components/ScreenReaderAnnouncer";
 
 export const App = () => {
     const { state, dispatch } = useContext(AppStateContext);
@@ -33,7 +33,7 @@ export const App = () => {
                 // Load catalog and validator plans into state.
                 await loadCatalogAsync();
                 await loadValidatorPlansAsync();
-                await tryLoadLastActiveRubricAsync();
+                await tryLoadLastActiveChecklistAsync();
 
                 // Test notification
                 showToast({
@@ -57,11 +57,11 @@ export const App = () => {
         <>
             <HeaderBar />
             <MainPanel />
-            <CatalogModal />
-            <ImportRubricModal />
+            <ImportChecklistModal />
             <ConfirmationModal />
             <BlockPickerModal />
             <Toasts />
+            <ScreenReaderAnnouncer />
         </>
     );
 };

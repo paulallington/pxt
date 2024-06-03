@@ -1,7 +1,7 @@
 import { ToastWithId, TabName, ProjectData } from "../types";
 import { CatalogCriteria, CriteriaResult } from "../types/criteria";
 import { ModalOptions } from "../types/modalOptions";
-import { Rubric } from "../types/rubric";
+import { Checklist } from "../types/checklist";
 
 // Changes to app state are performed by dispatching actions to the reducer
 type ActionBase = {
@@ -51,9 +51,14 @@ type SetCatalog = ActionBase & {
     catalog: CatalogCriteria[] | undefined;
 };
 
-type SetRubric = ActionBase & {
-    type: "SET_RUBRIC";
-    rubric: Rubric;
+type SetCatalogOpen = ActionBase & {
+    type: "SET_CATALOG_OPEN";
+    open: boolean;
+};
+
+type SetChecklist = ActionBase & {
+    type: "SET_CHECKLIST";
+    checklist: Checklist;
 };
 
 type ShowModal = ActionBase & {
@@ -100,6 +105,11 @@ type SetBlockImageUri = ActionBase & {
     imageUri: string;
 };
 
+type SetScreenReaderAnnouncement = ActionBase & {
+    type: "SET_SCREEN_READER_ANNOUNCEMENT";
+    announcement: string;
+};
+
 /**
  * Union of all actions
  */
@@ -115,14 +125,16 @@ export type Action =
     | SetEvalResultsBatch
     | SetTargetConfig
     | SetCatalog
-    | SetRubric
+    | SetCatalogOpen
+    | SetChecklist
     | ShowModal
     | HideModal
     | SetValidatorPlans
     | SetActiveTab
     | SetAutorun
     | SetToolboxCategories
-    | SetBlockImageUri;
+    | SetBlockImageUri
+    | SetScreenReaderAnnouncement;
 
 /**
  * Action creators
@@ -167,9 +179,14 @@ const setCatalog = (catalog: CatalogCriteria[] | undefined): SetCatalog => ({
     catalog,
 });
 
-const setRubric = (rubric: Rubric): SetRubric => ({
-    type: "SET_RUBRIC",
-    rubric,
+const setCatalogOpen = (open: boolean): SetCatalogOpen => ({
+    type: "SET_CATALOG_OPEN",
+    open,
+});
+
+const setChecklist = (checklist: Checklist): SetChecklist => ({
+    type: "SET_CHECKLIST",
+    checklist,
 });
 
 const showModal = (modalOptions: ModalOptions): ShowModal => ({
@@ -216,6 +233,11 @@ const setBlockImageUri = (blockId: string, imageUri: string): SetBlockImageUri =
     imageUri,
 });
 
+const setScreenReaderAnnouncement = (announcement: string): SetScreenReaderAnnouncement => ({
+    type: "SET_SCREEN_READER_ANNOUNCEMENT",
+    announcement,
+});
+
 export {
     showToast,
     dismissToast,
@@ -227,7 +249,8 @@ export {
     setEvalResultsBatch,
     setTargetConfig,
     setCatalog,
-    setRubric,
+    setCatalogOpen,
+    setChecklist,
     showModal,
     hideModal,
     setValidatorPlans,
@@ -235,4 +258,5 @@ export {
     setAutorun,
     setToolboxCategories,
     setBlockImageUri,
+    setScreenReaderAnnouncement,
 };

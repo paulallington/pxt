@@ -2752,27 +2752,31 @@ function renderDocs(builtPackaged: string, localDir: string) {
             if (/\.(md|html)$/.test(f)) {
                 const fileData = buf.toString("utf8");
                 let html = "";
-                if (U.endsWith(f, ".md")) {
-                    const md = nodeutil.resolveMd(
-                        ".",
-                        pathUnderDocs.slice(0, -3),
-                        fileData
-                    );
-                    // patch any /static/... url to /docs/static/...
-                    const patchedMd = md.replace(/\"\/static\//g, `"/docs/static/`);
-                    nodeutil.writeFileSync(outputFile, patchedMd, { encoding: "utf8" });
+                try{
+                    if (U.endsWith(f, ".md")) {
+                        const md = nodeutil.resolveMd(
+                            ".",
+                            pathUnderDocs.slice(0, -3),
+                            fileData
+                        );
+                        // patch any /static/... url to /docs/static/...
+                        const patchedMd = md.replace(/\"\/static\//g, `"/docs/static/`);
+                        nodeutil.writeFileSync(outputFile, patchedMd, { encoding: "utf8" });
 
-                    html = pxt.docs.renderMarkdown({
-                        template: docsTemplate,
-                        markdown: patchedMd,
-                        theme: pxt.appTarget.appTheme,
-                        filepath: path.join("docs", pathUnderDocs),
-                    });
+                        html = pxt.docs.renderMarkdown({
+                            template: docsTemplate,
+                            markdown: patchedMd,
+                            theme: pxt.appTarget.appTheme,
+                            filepath: path.join("docs", pathUnderDocs),
+                        });
 
-                    // replace .md with .html for rendered page drop
-                    outputFile = outputFile.slice(0, -3) + ".html";
-                } else {
-                    html = server.expandHtml(fileData);
+                        // replace .md with .html for rendered page drop
+                        outputFile = outputFile.slice(0, -3) + ".html";
+                    } else {
+                        html = server.expandHtml(fileData);
+                    }
+                }catch (e) {
+                    pxt.log(`Doc failed to write ${f}`);
                 }
 
                 html = html.replace(/(<a[^<>]*)\shref="(\/[^<>"]*)"/g, (f, beg, url) => {
